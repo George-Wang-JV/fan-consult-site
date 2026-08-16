@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>粉丝咨询中心</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast hidden"></div>
+
+  <main id="authView" class="auth-shell">
+    <section class="auth-card">
+      <div class="brand">💬 区块透镜粉丝群</div>
+      <p class="muted">注册后可进行一对一咨询，并申请加入粉丝交流群。</p>
+      <div class="tabs">
+        <button id="loginTab" class="tab active">登录</button>
+        <button id="registerTab" class="tab">注册</button>
+      </div>
+
+      <form id="loginForm" class="form-stack">
+        <label>邮箱<input name="email" type="email" required /></label>
+        <label>密码<input name="password" type="password" required /></label>
+        <button class="primary" type="submit">登录</button>
+      </form>
+
+      <form id="registerForm" class="form-stack hidden">
+        <label>昵称<input name="nickname" maxlength="30" required /></label>
+        <label>邮箱<input name="email" type="email" required /></label>
+        <label>密码<input name="password" type="password" minlength="8" required /></label>
+        <button class="primary" type="submit">创建账号</button>
+      </form>
+    </section>
+  </main>
+
+  <div id="appView" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand small">💬 咨询中心</div>
+      <div id="meCard" class="me-card"></div>
+      <nav>
+        <button data-page="home" class="nav-btn active">🏠 我的主页</button>
+        <button data-page="direct" class="nav-btn">👤 一对一咨询</button>
+        <button data-page="groups" class="nav-btn">👥 粉丝交流群</button>
+        <button id="adminBtn" data-page="admin" class="nav-btn hidden">🛡️ 管理后台</button>
+      </nav>
+      <button id="logoutBtn" class="ghost">退出登录</button>
+    </aside>
+
+    <section class="content">
+      <header class="topbar">
+        <button id="mobileMenu" class="ghost mobile-only">☰</button>
+        <h1 id="pageTitle">我的主页</h1>
+      </header>
+
+      <div id="homePage" class="page">
+        <div class="hero-card">
+          <h2>欢迎来到废慨vc咨询中心</h2>
+          <p>私人群，说啥都行，没有审核。</p>
+          <div class="hero-actions">
+            <button class="primary" data-goto="direct">开始咨询</button>
+            <button class="secondary" data-goto="groups">查看群聊</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="directPage" class="page hidden">
+        <div class="chat-layout">
+          <aside id="directContacts" class="contact-list"></aside>
+          <section class="chat-panel">
+            <div id="directHeader" class="chat-header">请选择联系人</div>
+            <div id="directMessages" class="messages"></div>
+            <form id="directForm" class="composer hidden">
+              <input id="directInput" maxlength="2000" placeholder="输入消息…" autocomplete="off" />
+              <button class="primary" type="submit">发送</button>
+            </form>
+          </section>
+        </div>
+      </div>
+
+      <div id="groupsPage" class="page hidden">
+        <div id="groupList" class="card-grid"></div>
+        <section id="groupChat" class="chat-panel standalone hidden">
+          <div id="groupHeader" class="chat-header"></div>
+          <div id="pinnedMessage" class="pinned hidden"></div>
+          <div id="groupMessages" class="messages"></div>
+          <form id="groupForm" class="composer">
+            <input id="groupInput" maxlength="2000" placeholder="发送群消息…" autocomplete="off" />
+            <button class="primary" type="submit">发送</button>
+          </form>
+        </section>
+      </div>
+
+      <div id="adminPage" class="page hidden">
+        <div class="admin-grid">
+          <section class="panel">
+            <h3>创建粉丝群</h3>
+            <form id="createGroupForm" class="form-stack compact">
+              <label>群名称<input name="name" maxlength="40" required /></label>
+              <label>简介<textarea name="description" maxlength="200"></textarea></label>
+              <button class="primary" type="submit">创建群聊</button>
+            </form>
+          </section>
+          <section class="panel">
+            <h3>群管理</h3>
+            <div id="adminGroupList"></div>
+          </section>
+        </div>
+        <section id="groupManagePanel" class="panel hidden">
+          <h3 id="manageGroupTitle">群管理</h3>
+          <div class="manage-columns">
+            <div><h4>待审核申请</h4><div id="joinRequests"></div></div>
+            <div><h4>群成员</h4><div id="groupMembers"></div></div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
