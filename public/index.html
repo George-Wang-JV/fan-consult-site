@@ -39,8 +39,8 @@
       <div id="meCard" class="me-card"></div>
       <nav>
         <button data-page="home" class="nav-btn active">🏠 我的主页</button>
-        <button data-page="direct" class="nav-btn">👤 一对一咨询</button>
-        <button data-page="groups" class="nav-btn">👥 粉丝交流群</button>
+        <button data-page="direct" class="nav-btn">👤 一对一咨询 <span id="directUnread" class="unread-badge hidden"></span></button>
+        <button data-page="groups" class="nav-btn">👥 粉丝交流群 <span id="groupUnread" class="unread-badge hidden"></span></button>
         <button id="adminBtn" data-page="admin" class="nav-btn hidden">🛡️ 管理后台</button>
       </nav>
       <button id="logoutBtn" class="ghost">退出登录</button>
@@ -59,6 +59,7 @@
           <div class="hero-actions">
             <button class="primary" data-goto="direct">开始咨询</button>
             <button class="secondary" data-goto="groups">查看群聊</button>
+            <button id="enableNotifications" class="secondary">🔔 开启新消息通知</button>
           </div>
         </div>
       </div>

@@ -12,6 +12,7 @@
 - 管理员置顶群消息
 - SQLite 本地数据库
 - Socket.IO 实时通信
+- Web Push 系统通知、未读红点与通知点击直达会话
 
 ## 1. 本地运行
 
@@ -19,7 +20,7 @@
 
 ```bash
 cp .env.example .env
-# 修改 .env 中的 SESSION_SECRET、ADMIN_EMAIL、ADMIN_PASSWORD
+# 修改 .env 中的 SESSION_SECRET、管理员账号和 VAPID 配置
 npm install
 npm start
 ```
@@ -94,6 +95,26 @@ SESSION_SECRET=这里放至少32位随机字符串
 ADMIN_EMAIL=你的管理员邮箱
 ADMIN_PASSWORD=一个非常强的管理员密码
 ADMIN_NICKNAME=管理员
+VAPID_PUBLIC_KEY=使用下方命令生成的公钥
+VAPID_PRIVATE_KEY=使用下方命令生成的私钥
+VAPID_SUBJECT=mailto:你的联系邮箱
+```
+
+首次配置 Web Push 时，在项目目录生成一对 VAPID 密钥（生成后应长期保持不变，不要提交私钥）：
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+将输出的公钥和私钥填入 `.env`。Web Push 在生产环境需要 HTTPS；用户登录后点击“开启新消息通知”并允许浏览器权限即可订阅。
+
+更新已部署的服务：
+
+```bash
+git pull
+npm install
+# 编辑 .env，加入 VAPID_PUBLIC_KEY、VAPID_PRIVATE_KEY、VAPID_SUBJECT
+pm2 restart fan-consult-site
 ```
 
 ## 5. Nginx 配置

@@ -9,10 +9,17 @@ const SQLiteStore = require('connect-sqlite3')(session);
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const helmet = require('helmet');
+const webpush = require('web-push');
 const { Server } = require('socket.io');
 
 const PORT = Number(process.env.PORT || 3000);
 const isProd = process.env.NODE_ENV === 'production';
+const vapidPublicKey = String(process.env.VAPID_PUBLIC_KEY || '').trim();
+const vapidPrivateKey = String(process.env.VAPID_PRIVATE_KEY || '').trim();
+const vapidSubject = String(process.env.VAPID_SUBJECT || 'mailto:admin@example.com').trim();
+const pushEnabled = Boolean(vapidPublicKey && vapidPrivateKey);
+if (pushEnabled) webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+else console.warn('⚠️ Web Push 未启用：请配置 VAPID_PUBLIC_KEY 和 VAPID_PRIVATE_KEY。');
 const dataDir = path.join(__dirname, 'data');
 fs.mkdirSync(dataDir, { recursive: true });
 
@@ -72,10 +79,61 @@ CREATE TABLE IF NOT EXISTS group_messages (
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_direct_pair ON direct_messages(from_user_id, to_user_id, id);
 CREATE INDEX IF NOT EXISTS idx_group_messages ON group_messages(group_id, id);
 CREATE INDEX IF NOT EXISTS idx_group_member_status ON group_members(group_id, status);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
 `);
+
+// Tracks the chat visible in each subscribed browser. Unknown/offline endpoints still receive push.
+const endpointPresence = new Map();
+
+function isViewingChat(endpoint, chatType, chatId) {
+  const browserTabs = endpointPresence.get(endpoint);
+  return Boolean(browserTabs && [...browserTabs.values()].some((presence) =>
+    presence.visible && presence.chatType === chatType && Number(presence.chatId) === Number(chatId)
+  ));
+}
+
+function notificationPreview(content, max = 180) {
+  const text = String(content || '');
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+async function sendPushToUsers(userIds, notification, chatType, chatId) {
+  if (!pushEnabled || !userIds.length) return;
+  const placeholders = userIds.map(() => '?').join(',');
+  const subscriptions = db.prepare(`SELECT * FROM push_subscriptions WHERE user_id IN (${placeholders})`).all(...userIds);
+  const payload = JSON.stringify(notification);
+
+  await Promise.allSettled(subscriptions.map(async (row) => {
+    if (isViewingChat(row.endpoint, chatType, chatId)) return;
+    try {
+      await webpush.sendNotification({
+        endpoint: row.endpoint,
+        keys: { p256dh: row.p256dh, auth: row.auth }
+      }, payload, { TTL: 60 * 60, urgency: 'high' });
+    } catch (err) {
+      if (err.statusCode === 404 || err.statusCode === 410) {
+        db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(row.endpoint);
+        endpointPresence.delete(row.endpoint);
+        return;
+      }
+      console.error('Web Push 发送失败:', err.statusCode || err.message);
+    }
+  }));
+}
 
 function seedAdmin() {
   const existing = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get();
@@ -243,6 +301,40 @@ app.get('/api/me', (req, res) => {
   res.json({ user: publicUser(currentUser(req)) });
 });
 
+// ---------- Web Push ----------
+app.get('/api/push/public-key', requireAuth, (req, res) => {
+  if (!pushEnabled) return res.status(503).json({ error: '服务器尚未配置 Web Push' });
+  res.json({ publicKey: vapidPublicKey });
+});
+
+app.post('/api/push/subscribe', requireAuth, (req, res) => {
+  const subscription = req.body.subscription;
+  const endpoint = String(subscription?.endpoint || '').trim();
+  const p256dh = String(subscription?.keys?.p256dh || '').trim();
+  const auth = String(subscription?.keys?.auth || '').trim();
+  let endpointUrl;
+  try { endpointUrl = new URL(endpoint); } catch { endpointUrl = null; }
+  if (!endpointUrl || endpointUrl.protocol !== 'https:' || !p256dh || !auth) {
+    return res.status(400).json({ error: '订阅数据不完整' });
+  }
+  db.prepare(`
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh,
+      auth = excluded.auth, updated_at = datetime('now')
+  `).run(req.user.id, endpoint, p256dh, auth);
+  res.json({ ok: true });
+});
+
+app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
+  const endpoint = String(req.body.endpoint || '').trim();
+  if (endpoint) {
+    db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?').run(endpoint, req.user.id);
+    endpointPresence.delete(endpoint);
+  }
+  res.json({ ok: true });
+});
+
 // ---------- Direct consultation ----------
 app.get('/api/direct/contacts', requireAuth, (req, res) => {
   if (req.user.is_admin) {
@@ -310,6 +402,10 @@ app.post('/api/direct/messages', requireAuth, (req, res) => {
   `).get(info.lastInsertRowid);
 
   io.to(`user:${req.user.id}`).to(`user:${toUserId}`).emit('direct:new', message);
+  void sendPushToUsers([toUserId], {
+    title: `${req.user.nickname} 发来新咨询`, body: notificationPreview(content),
+    tag: `direct-${req.user.id}`, url: `/?direct=${req.user.id}`
+  }, 'direct', req.user.id).catch((err) => console.error('Web Push 处理失败:', err));
   res.json({ message });
 });
 
@@ -469,6 +565,15 @@ app.post('/api/groups/:groupId/messages', requireAuth, (req, res) => {
     WHERE gm.id = ?
   `).get(info.lastInsertRowid);
   io.to(`group:${groupId}`).emit('group:new', message);
+  const group = db.prepare('SELECT name FROM groups WHERE id = ?').get(groupId);
+  const recipients = db.prepare(`
+    SELECT user_id FROM group_members
+    WHERE group_id = ? AND status = 'approved' AND user_id != ?
+  `).all(groupId, req.user.id).map((row) => row.user_id);
+  void sendPushToUsers(recipients, {
+    title: group?.name || '粉丝交流群', body: notificationPreview(`${req.user.nickname}：${content}`),
+    tag: `group-${groupId}`, url: `/?group=${groupId}`
+  }, 'group', groupId).catch((err) => console.error('Web Push 处理失败:', err));
   res.json({ message });
 });
 
@@ -502,6 +607,27 @@ io.on('connection', (socket) => {
     const groupId = Number(groupIdRaw);
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
     if (user?.is_admin || isApprovedMember(groupId, userId)) socket.join(`group:${groupId}`);
+  });
+
+  socket.on('presence:update', (raw = {}) => {
+    const endpoint = String(raw.endpoint || '').trim();
+    if (!endpoint) return;
+    const owned = db.prepare('SELECT 1 FROM push_subscriptions WHERE endpoint = ? AND user_id = ?').get(endpoint, userId);
+    if (!owned) return;
+    const chatType = raw.chatType === 'direct' || raw.chatType === 'group' ? raw.chatType : null;
+    const browserTabs = endpointPresence.get(endpoint) || new Map();
+    browserTabs.set(socket.id, {
+      socketId: socket.id, userId: Number(userId), visible: Boolean(raw.visible), chatType,
+      chatId: chatType ? Number(raw.chatId) : null
+    });
+    endpointPresence.set(endpoint, browserTabs);
+  });
+
+  socket.on('disconnect', () => {
+    for (const [endpoint, browserTabs] of endpointPresence.entries()) {
+      browserTabs.delete(socket.id);
+      if (!browserTabs.size) endpointPresence.delete(endpoint);
+    }
   });
 });
 

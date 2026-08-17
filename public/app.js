@@ -7,7 +7,12 @@ const state = {
   directContact: null,
   groups: [],
   activeGroup: null,
-  manageGroup: null
+  manageGroup: null,
+  currentPage: 'home',
+  pushEndpoint: null,
+  directUnread: {},
+  groupUnread: {},
+  pendingRoute: null
 };
 
 function toast(message) {
@@ -45,23 +50,112 @@ function showAuth() {
   $('#appView').classList.add('hidden');
 }
 
-function showApp() {
+async function showApp() {
   $('#authView').classList.add('hidden');
   $('#appView').classList.remove('hidden');
   $('#meCard').innerHTML = `<strong>${escapeHtml(state.me.nickname)}</strong><br><span class="muted">${state.me.isAdmin ? '管理员' : '粉丝用户'}</span>`;
   $('#adminBtn').classList.toggle('hidden', !state.me.isAdmin);
   connectSocket();
-  goPage('home');
+  await setupPush(false);
+  await openInitialRoute();
+}
+
+function totalUnread(map) { return Object.values(map).reduce((sum, count) => sum + count, 0); }
+function setBadge(selector, count) {
+  const el = $(selector);
+  el.textContent = count > 99 ? '99+' : String(count);
+  el.classList.toggle('hidden', !count);
+}
+function renderUnread() {
+  setBadge('#directUnread', totalUnread(state.directUnread));
+  setBadge('#groupUnread', totalUnread(state.groupUnread));
+}
+
+function activeChat() {
+  if (document.visibilityState !== 'visible' || !document.hasFocus()) return null;
+  if (state.currentPage === 'direct' && state.directContact) return { chatType:'direct', chatId:state.directContact.id };
+  if (state.currentPage === 'groups' && state.activeGroup) return { chatType:'group', chatId:state.activeGroup.id };
+  return null;
+}
+
+function updatePresence() {
+  if (!state.socket?.connected || !state.pushEndpoint) return;
+  const chat = activeChat();
+  state.socket.emit('presence:update', {
+    endpoint: state.pushEndpoint,
+    visible: Boolean(chat),
+    chatType: chat?.chatType || null,
+    chatId: chat?.chatId || null
+  });
+}
+
+function urlBase64ToUint8Array(value) {
+  const padding = '='.repeat((4 - value.length % 4) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+}
+
+async function setupPush(requestPermission) {
+  const button = $('#enableNotifications');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    button.textContent = '此浏览器不支持通知'; button.disabled = true; return;
+  }
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js');
+    if (requestPermission && Notification.permission === 'default') await Notification.requestPermission();
+    if (Notification.permission !== 'granted') {
+      button.textContent = Notification.permission === 'denied' ? '通知已被浏览器禁止' : '🔔 开启新消息通知';
+      button.disabled = Notification.permission === 'denied'; return;
+    }
+    const { publicKey } = await api('/api/push/public-key');
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+    await api('/api/push/subscribe', { method:'POST', body:JSON.stringify({ subscription:subscription.toJSON() }) });
+    state.pushEndpoint = subscription.endpoint;
+    button.textContent = '✓ 新消息通知已开启'; button.disabled = true;
+    updatePresence();
+  } catch (err) {
+    if (requestPermission) toast(err.message || '开启通知失败');
+  }
+}
+
+async function openInitialRoute() {
+  const params = new URLSearchParams(location.search);
+  const directId = Number(params.get('direct'));
+  const groupId = Number(params.get('group'));
+  if (directId) {
+    state.pendingRoute = { type:'direct', id:directId };
+    goPage('direct');
+  } else if (groupId) {
+    state.pendingRoute = { type:'group', id:groupId };
+    goPage('groups');
+  } else goPage('home');
 }
 
 function connectSocket() {
   if (state.socket) state.socket.disconnect();
   state.socket = io();
-  state.socket.on('direct:new', () => {
-    if (!$('#directPage').classList.contains('hidden') && state.directContact) loadDirectMessages();
+  state.socket.on('connect', updatePresence);
+  state.socket.on('direct:new', (msg) => {
+    const otherId = msg.from_user_id === state.me.id ? msg.to_user_id : msg.from_user_id;
+    const chat = activeChat();
+    if (msg.from_user_id !== state.me.id && !(chat?.chatType === 'direct' && chat.chatId === otherId)) {
+      state.directUnread[otherId] = (state.directUnread[otherId] || 0) + 1;
+      renderUnread();
+      if (state.currentPage === 'direct') loadDirectContacts();
+    }
+    if (state.currentPage === 'direct' && state.directContact?.id === otherId) loadDirectMessages();
   });
   state.socket.on('group:new', (msg) => {
-    if (state.activeGroup?.id === msg.group_id) loadGroupMessages(state.activeGroup.id);
+    const chat = activeChat();
+    if (msg.user_id !== state.me.id && !(chat?.chatType === 'group' && chat.chatId === msg.group_id)) {
+      state.groupUnread[msg.group_id] = (state.groupUnread[msg.group_id] || 0) + 1;
+      renderUnread();
+      if (state.currentPage === 'groups') loadGroups();
+    }
+    if (state.currentPage === 'groups' && state.activeGroup?.id === msg.group_id) loadGroupMessages(msg.group_id);
   });
   state.socket.on('group:pinned', ({ groupId }) => {
     if (state.activeGroup?.id === groupId) loadGroupMessages(groupId);
@@ -89,10 +183,12 @@ function goPage(name) {
   $(`#${name}Page`).classList.remove('hidden');
   $$('.nav-btn').forEach(x => x.classList.toggle('active', x.dataset.page === name));
   $('#pageTitle').textContent = titles[name];
+  state.currentPage = name;
   $('.sidebar').classList.remove('open');
   if (name === 'direct') loadDirectContacts();
   if (name === 'groups') loadGroups();
   if (name === 'admin' && state.me.isAdmin) loadAdminGroups();
+  updatePresence();
 }
 
 // Auth tabs
@@ -124,6 +220,7 @@ $('#registerForm').onsubmit = async (e) => {
 };
 
 $('#logoutBtn').onclick = async () => {
+  if (state.pushEndpoint) await api('/api/push/unsubscribe', { method:'POST', body:JSON.stringify({ endpoint:state.pushEndpoint }) }).catch(() => {});
   await api('/api/logout', { method:'POST' });
   state.me = null;
   state.socket?.disconnect();
@@ -133,6 +230,10 @@ $('#logoutBtn').onclick = async () => {
 $$('.nav-btn').forEach(btn => btn.onclick = () => goPage(btn.dataset.page));
 $$('[data-goto]').forEach(btn => btn.onclick = () => goPage(btn.dataset.goto));
 $('#mobileMenu').onclick = () => $('.sidebar').classList.toggle('open');
+$('#enableNotifications').onclick = () => setupPush(true);
+document.addEventListener('visibilitychange', updatePresence);
+window.addEventListener('focus', updatePresence);
+window.addEventListener('blur', updatePresence);
 
 // Direct chat
 async function loadDirectContacts() {
@@ -145,17 +246,24 @@ async function loadDirectContacts() {
     }
     box.innerHTML = contacts.map(c => `
       <div class="contact-item ${state.directContact?.id === c.id ? 'active' : ''}" data-user-id="${c.id}">
-        <div class="contact-name">${escapeHtml(c.nickname)} ${c.isAdmin ? '🛡️' : ''}</div>
+        <div class="contact-name"><span>${escapeHtml(c.nickname)} ${c.isAdmin ? '🛡️' : ''}</span>${state.directUnread[c.id] ? `<span class="unread-badge">${state.directUnread[c.id]}</span>` : ''}</div>
         <div class="contact-meta">${escapeHtml(c.email)}</div>
       </div>`).join('');
     $$('#directContacts .contact-item[data-user-id]').forEach(el => el.onclick = () => {
       state.directContact = contacts.find(c => c.id === Number(el.dataset.userId));
+      delete state.directUnread[state.directContact.id]; renderUnread();
       loadDirectContacts();
       loadDirectMessages();
+      updatePresence();
     });
     if (!state.directContact && contacts.length === 1) {
       state.directContact = contacts[0];
       loadDirectMessages();
+    }
+    if (state.pendingRoute?.type === 'direct') {
+      const target = contacts.find(c => c.id === state.pendingRoute.id);
+      state.pendingRoute = null;
+      if (target) { state.directContact = target; delete state.directUnread[target.id]; renderUnread(); loadDirectContacts(); loadDirectMessages(); updatePresence(); }
     }
   } catch (err) { toast(err.message); }
 }
@@ -197,7 +305,7 @@ async function loadGroups() {
       else if (g.my_status === 'pending') action = `<button class="small-btn" disabled>等待审核</button>`;
       else action = `<button class="secondary" data-join-group="${g.id}">申请加入</button>`;
       return `<article class="group-card">
-        <h3>${escapeHtml(g.name)}</h3>
+        <h3><span>${escapeHtml(g.name)}</span>${state.groupUnread[g.id] ? `<span class="unread-badge">${state.groupUnread[g.id]}</span>` : ''}</h3>
         <p>${escapeHtml(g.description || '暂无简介')}</p>
         <div class="badge">${g.member_count} 位成员</div><br>
         ${action}
@@ -209,6 +317,10 @@ async function loadGroups() {
       catch (err) { toast(err.message); }
     });
     $$('[data-open-group]').forEach(btn => btn.onclick = () => openGroup(Number(btn.dataset.openGroup)));
+    if (state.pendingRoute?.type === 'group') {
+      const groupId = state.pendingRoute.id; state.pendingRoute = null;
+      if (groups.some(g => g.id === groupId && (state.me.isAdmin || g.my_status === 'approved'))) openGroup(groupId);
+    }
   } catch (err) { toast(err.message); }
 }
 
@@ -216,8 +328,10 @@ async function openGroup(groupId) {
   state.activeGroup = state.groups.find(g => g.id === groupId) || { id: groupId, name:'群聊' };
   $('#groupChat').classList.remove('hidden');
   $('#groupHeader').textContent = state.activeGroup.name;
+  delete state.groupUnread[groupId]; renderUnread();
   state.socket?.emit('group:join', groupId);
   await loadGroupMessages(groupId);
+  updatePresence();
   $('#groupChat').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
