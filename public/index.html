@@ -75,8 +75,16 @@
             <div id="directHeader" class="chat-header">请选择联系人</div>
             <div id="directMessages" class="messages"></div>
             <form id="directForm" class="composer hidden">
-              <input id="directInput" maxlength="2000" placeholder="输入消息…" autocomplete="off" />
-              <button class="primary" type="submit">发送</button>
+              <div class="composer-tools" aria-label="更多发送方式">
+                <button type="button" class="composer-tool" data-rich-action="image" data-scope="direct">📷 照片</button>
+                <button type="button" class="composer-tool" data-rich-action="video" data-scope="direct">🎬 视频</button>
+                <button type="button" class="composer-tool" data-rich-action="audio" data-scope="direct">🎤 语音</button>
+                <button type="button" class="composer-tool" data-rich-action="location" data-scope="direct">📍 位置</button>
+              </div>
+              <div class="composer-main">
+                <input id="directInput" maxlength="2000" placeholder="输入消息…" autocomplete="off" />
+                <button class="primary" type="submit">发送</button>
+              </div>
             </form>
           </section>
         </div>
@@ -89,8 +97,16 @@
           <div id="pinnedMessage" class="pinned hidden"></div>
           <div id="groupMessages" class="messages"></div>
           <form id="groupForm" class="composer">
-            <input id="groupInput" maxlength="2000" placeholder="发送群消息…" autocomplete="off" />
-            <button class="primary" type="submit">发送</button>
+            <div class="composer-tools" aria-label="更多发送方式">
+              <button type="button" class="composer-tool" data-rich-action="image" data-scope="group">📷 照片</button>
+              <button type="button" class="composer-tool" data-rich-action="video" data-scope="group">🎬 视频</button>
+              <button type="button" class="composer-tool" data-rich-action="audio" data-scope="group">🎤 语音</button>
+              <button type="button" class="composer-tool" data-rich-action="location" data-scope="group">📍 位置</button>
+            </div>
+            <div class="composer-main">
+              <input id="groupInput" maxlength="2000" placeholder="发送群消息…" autocomplete="off" />
+              <button class="primary" type="submit">发送</button>
+            </div>
           </form>
         </section>
       </div>
@@ -118,6 +134,24 @@
           </div>
         </section>
       </div>
+    </section>
+  </div>
+
+  <input id="mediaPicker" class="hidden" type="file" />
+  <div id="messageActions" class="action-backdrop hidden" role="presentation">
+    <section class="action-sheet" role="dialog" aria-modal="true" aria-label="消息操作">
+      <div class="action-title">回应这条消息</div>
+      <div class="reaction-picker">
+        <button type="button" data-reaction="👍">👍</button>
+        <button type="button" data-reaction="❤️">❤️</button>
+        <button type="button" data-reaction="😂">😂</button>
+        <button type="button" data-reaction="😮">😮</button>
+        <button type="button" data-reaction="😢">😢</button>
+        <button type="button" data-reaction="🙏">🙏</button>
+      </div>
+      <button id="recallMessage" type="button" class="action-row">↩️ 撤回（所有人不可见）</button>
+      <button id="deleteMessage" type="button" class="action-row danger-text">🗑️ 删除（仅自己不可见）</button>
+      <button id="closeMessageActions" type="button" class="action-row cancel-row">取消</button>
     </section>
   </div>
 

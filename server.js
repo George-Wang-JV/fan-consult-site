@@ -3,6 +3,7 @@ require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
@@ -21,7 +22,9 @@ const pushEnabled = Boolean(vapidPublicKey && vapidPrivateKey);
 if (pushEnabled) webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 else console.warn('⚠️ Web Push 未启用：请配置 VAPID_PUBLIC_KEY 和 VAPID_PRIVATE_KEY。');
 const dataDir = path.join(__dirname, 'data');
+const uploadsDir = path.join(dataDir, 'uploads');
 fs.mkdirSync(dataDir, { recursive: true });
+fs.mkdirSync(uploadsDir, { recursive: true });
 
 const db = new Database(path.join(dataDir, 'app.db'));
 db.pragma('journal_mode = WAL');
@@ -100,12 +103,57 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS media_uploads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  filename TEXT NOT NULL UNIQUE,
+  original_name TEXT NOT NULL DEFAULT '',
+  mime_type TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS message_reactions (
+  message_scope TEXT NOT NULL,
+  message_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  emoji TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY(message_scope, message_id, user_id, emoji),
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS message_deletions (
+  message_scope TEXT NOT NULL,
+  message_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  deleted_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY(message_scope, message_id, user_id),
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_direct_pair ON direct_messages(from_user_id, to_user_id, id);
 CREATE INDEX IF NOT EXISTS idx_direct_recipient ON direct_messages(to_user_id, from_user_id, id);
 CREATE INDEX IF NOT EXISTS idx_group_messages ON group_messages(group_id, id);
 CREATE INDEX IF NOT EXISTS idx_group_member_status ON group_members(group_id, status);
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_reactions_message ON message_reactions(message_scope, message_id);
+CREATE INDEX IF NOT EXISTS idx_deletions_user ON message_deletions(user_id, message_scope, message_id);
 `);
+
+function ensureColumn(table, column, definition) {
+  const exists = db.prepare(`PRAGMA table_info(${table})`).all().some((item) => item.name === column);
+  if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
+for (const table of ['direct_messages', 'group_messages']) {
+  ensureColumn(table, 'message_type', "TEXT NOT NULL DEFAULT 'text'");
+  ensureColumn(table, 'media_id', 'INTEGER');
+  ensureColumn(table, 'metadata', "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumn(table, 'is_recalled', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(table, 'recalled_at', 'TEXT');
+}
 
 // Tracks the chat visible in each subscribed browser. Unknown/offline endpoints still receive push.
 const endpointPresence = new Map();
@@ -244,24 +292,46 @@ function getDirectContacts(user) {
     SELECT u.*,
       (SELECT COUNT(*) FROM direct_messages incoming
        WHERE incoming.from_user_id = u.id AND incoming.to_user_id = ?
+         AND incoming.is_recalled = 0
+         AND NOT EXISTS (SELECT 1 FROM message_deletions deleted
+           WHERE deleted.message_scope = 'direct' AND deleted.message_id = incoming.id AND deleted.user_id = ?)
          AND incoming.id > COALESCE((SELECT drs.last_read_message_id FROM direct_read_state drs
            WHERE drs.user_id = ? AND drs.other_user_id = u.id), 0)) AS unread_count,
       (SELECT latest.id FROM direct_messages latest
-       WHERE (latest.from_user_id = ? AND latest.to_user_id = u.id)
-          OR (latest.from_user_id = u.id AND latest.to_user_id = ?)
+       WHERE ((latest.from_user_id = ? AND latest.to_user_id = u.id)
+          OR (latest.from_user_id = u.id AND latest.to_user_id = ?))
+         AND NOT EXISTS (SELECT 1 FROM message_deletions deleted
+           WHERE deleted.message_scope = 'direct' AND deleted.message_id = latest.id AND deleted.user_id = ?)
        ORDER BY latest.id DESC LIMIT 1) AS last_message_id,
-      (SELECT latest.content FROM direct_messages latest
-       WHERE (latest.from_user_id = ? AND latest.to_user_id = u.id)
-          OR (latest.from_user_id = u.id AND latest.to_user_id = ?)
+      (SELECT CASE
+          WHEN latest.is_recalled = 1 THEN '[消息已撤回]'
+          WHEN latest.message_type = 'image' THEN '[图片]'
+          WHEN latest.message_type = 'video' THEN '[视频]'
+          WHEN latest.message_type = 'audio' THEN '[语音]'
+          WHEN latest.message_type = 'location' THEN '[位置]'
+          ELSE latest.content END
+       FROM direct_messages latest
+       WHERE ((latest.from_user_id = ? AND latest.to_user_id = u.id)
+          OR (latest.from_user_id = u.id AND latest.to_user_id = ?))
+         AND NOT EXISTS (SELECT 1 FROM message_deletions deleted
+           WHERE deleted.message_scope = 'direct' AND deleted.message_id = latest.id AND deleted.user_id = ?)
        ORDER BY latest.id DESC LIMIT 1) AS last_message_content,
       (SELECT latest.created_at FROM direct_messages latest
-       WHERE (latest.from_user_id = ? AND latest.to_user_id = u.id)
-          OR (latest.from_user_id = u.id AND latest.to_user_id = ?)
+       WHERE ((latest.from_user_id = ? AND latest.to_user_id = u.id)
+          OR (latest.from_user_id = u.id AND latest.to_user_id = ?))
+         AND NOT EXISTS (SELECT 1 FROM message_deletions deleted
+           WHERE deleted.message_scope = 'direct' AND deleted.message_id = latest.id AND deleted.user_id = ?)
        ORDER BY latest.id DESC LIMIT 1) AS last_message_at
     FROM users u
     WHERE ${where}
     ORDER BY (unread_count > 0) DESC, COALESCE(last_message_id, 0) DESC, u.created_at DESC
-  `).all(user.id, user.id, user.id, user.id, user.id, user.id, user.id, user.id, ...(user.is_admin ? [] : [admin.id]));
+  `).all(
+    user.id, user.id, user.id,
+    user.id, user.id, user.id,
+    user.id, user.id, user.id,
+    user.id, user.id, user.id,
+    ...(user.is_admin ? [] : [admin.id])
+  );
 }
 
 function currentUser(req) {
@@ -310,6 +380,116 @@ function isApprovedMember(groupId, userId) {
 function isMuted(member) {
   if (!member?.mute_until) return false;
   return new Date(member.mute_until + 'Z').getTime() > Date.now();
+}
+
+const allowedReactions = new Set(['👍', '❤️', '😂', '😮', '😢', '🙏']);
+const mediaTypes = {
+  'image/jpeg': { kind:'image', ext:'.jpg' },
+  'image/png': { kind:'image', ext:'.png' },
+  'image/webp': { kind:'image', ext:'.webp' },
+  'image/gif': { kind:'image', ext:'.gif' },
+  'video/mp4': { kind:'video', ext:'.mp4' },
+  'video/webm': { kind:'video', ext:'.webm' },
+  'video/quicktime': { kind:'video', ext:'.mov' },
+  'audio/webm': { kind:'audio', ext:'.webm' },
+  'audio/mp4': { kind:'audio', ext:'.m4a' },
+  'audio/mpeg': { kind:'audio', ext:'.mp3' },
+  'audio/ogg': { kind:'audio', ext:'.ogg' },
+  'audio/wav': { kind:'audio', ext:'.wav' },
+  'audio/x-wav': { kind:'audio', ext:'.wav' }
+};
+
+function parseMetadata(value) {
+  try { return JSON.parse(value || '{}'); } catch { return {}; }
+}
+
+function messageTable(scope) {
+  if (scope === 'direct') return 'direct_messages';
+  if (scope === 'group') return 'group_messages';
+  return null;
+}
+
+function getAccessibleMessage(scope, messageId, user) {
+  if (scope === 'direct') {
+    const row = db.prepare('SELECT * FROM direct_messages WHERE id = ?').get(messageId);
+    if (!row || (row.from_user_id !== user.id && row.to_user_id !== user.id)) return null;
+    return row;
+  }
+  if (scope === 'group') {
+    const row = db.prepare('SELECT * FROM group_messages WHERE id = ?').get(messageId);
+    if (!row) return null;
+    if (!user.is_admin && !isApprovedMember(row.group_id, user.id)) return null;
+    return row;
+  }
+  return null;
+}
+
+function decorateMessages(scope, rows, userId) {
+  if (!rows.length) return rows;
+  const placeholders = rows.map(() => '?').join(',');
+  const reactions = db.prepare(`
+    SELECT emoji, user_id, message_id FROM message_reactions
+    WHERE message_scope = ? AND message_id IN (${placeholders})
+    ORDER BY created_at ASC
+  `).all(scope, ...rows.map((row) => row.id));
+  const grouped = new Map();
+  for (const reaction of reactions) {
+    const key = reaction.message_id;
+    if (!grouped.has(key)) grouped.set(key, new Map());
+    const emojiMap = grouped.get(key);
+    const item = emojiMap.get(reaction.emoji) || { emoji:reaction.emoji, count:0, mine:false };
+    item.count += 1;
+    if (reaction.user_id === userId) item.mine = true;
+    emojiMap.set(reaction.emoji, item);
+  }
+  return rows.map((row) => ({
+    ...row,
+    message_type: row.message_type || 'text',
+    metadata: parseMetadata(row.metadata),
+    media_url: row.media_id ? `/api/media/${row.media_id}` : null,
+    is_recalled: Boolean(row.is_recalled),
+    reactions: [...(grouped.get(row.id)?.values() || [])]
+  }));
+}
+
+function emitMessageChange(scope, row, event = 'message:updated') {
+  const payload = { scope, messageId:row.id, groupId:row.group_id || null };
+  if (scope === 'direct') {
+    io.to(`user:${row.from_user_id}`).to(`user:${row.to_user_id}`).emit(event, payload);
+  } else {
+    io.to(`group:${row.group_id}`).emit(event, payload);
+  }
+}
+
+function cleanMessagePayload(body, user) {
+  const messageType = ['text', 'image', 'video', 'audio', 'location'].includes(body.messageType) ? body.messageType : 'text';
+  let content = cleanText(body.content);
+  let mediaId = null;
+  let metadata = {};
+
+  if (messageType === 'text') {
+    if (!content) throw Object.assign(new Error('消息不能为空'), { status:400 });
+  } else if (messageType === 'location') {
+    const latitude = Number(body.metadata?.latitude);
+    const longitude = Number(body.metadata?.longitude);
+    const accuracy = Math.max(0, Number(body.metadata?.accuracy || 0));
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+        !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      throw Object.assign(new Error('位置数据无效'), { status:400 });
+    }
+    metadata = { latitude, longitude, accuracy };
+    content = content || '共享了一个位置';
+  } else {
+    mediaId = Number(body.mediaId);
+    const media = db.prepare('SELECT * FROM media_uploads WHERE id = ? AND user_id = ?').get(mediaId, user.id);
+    if (!media || mediaTypes[media.mime_type]?.kind !== messageType) {
+      throw Object.assign(new Error('媒体文件不存在或类型不匹配'), { status:400 });
+    }
+    metadata = { originalName:media.original_name, size:media.size, mimeType:media.mime_type };
+    content = content || ({ image:'[图片]', video:'[视频]', audio:'[语音]' }[messageType]);
+  }
+
+  return { content, messageType, mediaId, metadata:JSON.stringify(metadata) };
 }
 
 // ---------- Auth ----------
@@ -417,6 +597,109 @@ app.post('/api/push/test', requireAuth, async (req, res) => {
   }
 });
 
+// ---------- Media and message actions ----------
+app.post('/api/media/upload', requireAuth, express.raw({ type:() => true, limit:'50mb' }), (req, res) => {
+  const mimeType = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  const mediaType = mediaTypes[mimeType];
+  if (!mediaType || !Buffer.isBuffer(req.body) || !req.body.length) {
+    return res.status(400).json({ error:'不支持的文件类型' });
+  }
+  const maxSize = mediaType.kind === 'video' ? 50 * 1024 * 1024 : mediaType.kind === 'image' ? 12 * 1024 * 1024 : 15 * 1024 * 1024;
+  if (req.body.length > maxSize) return res.status(413).json({ error:`${mediaType.kind === 'video' ? '视频' : mediaType.kind === 'image' ? '图片' : '语音'}文件过大` });
+
+  let originalName = '';
+  try { originalName = decodeURIComponent(String(req.headers['x-file-name'] || '')).slice(0, 180); } catch { originalName = ''; }
+  const filename = `${crypto.randomUUID()}${mediaType.ext}`;
+  fs.writeFileSync(path.join(uploadsDir, filename), req.body, { flag:'wx' });
+  const info = db.prepare(`
+    INSERT INTO media_uploads (user_id, filename, original_name, mime_type, size)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(req.user.id, filename, originalName, mimeType, req.body.length);
+  res.json({ media:{ id:Number(info.lastInsertRowid), kind:mediaType.kind, mimeType, size:req.body.length } });
+});
+
+app.get('/api/media/:mediaId', requireAuth, (req, res) => {
+  const media = db.prepare('SELECT * FROM media_uploads WHERE id = ?').get(Number(req.params.mediaId));
+  if (!media) return res.status(404).json({ error:'文件不存在' });
+  let allowed = media.user_id === req.user.id;
+
+  if (!allowed) {
+    allowed = Boolean(db.prepare(`
+      SELECT 1 FROM direct_messages dm
+      WHERE dm.media_id = ? AND dm.is_recalled = 0
+        AND (dm.from_user_id = ? OR dm.to_user_id = ?)
+        AND NOT EXISTS (SELECT 1 FROM message_deletions md
+          WHERE md.message_scope = 'direct' AND md.message_id = dm.id AND md.user_id = ?)
+      LIMIT 1
+    `).get(media.id, req.user.id, req.user.id, req.user.id));
+  }
+  if (!allowed) {
+    const groupMessages = db.prepare(`SELECT id, group_id FROM group_messages WHERE media_id = ? AND is_recalled = 0`).all(media.id);
+    allowed = groupMessages.some((groupMessage) => {
+      const deleted = db.prepare(`SELECT 1 FROM message_deletions WHERE message_scope = 'group' AND message_id = ? AND user_id = ?`)
+        .get(groupMessage.id, req.user.id);
+      return !deleted && (req.user.is_admin || Boolean(isApprovedMember(groupMessage.group_id, req.user.id)));
+    });
+  }
+  if (!allowed) return res.status(403).json({ error:'无权查看该文件' });
+
+  const filePath = path.join(uploadsDir, media.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error:'文件已丢失' });
+  res.type(media.mime_type);
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.setHeader('Content-Disposition', `inline; filename="media${mediaTypes[media.mime_type]?.ext || ''}"`);
+  res.sendFile(filePath);
+});
+
+app.post('/api/messages/:scope/:messageId/reactions', requireAuth, (req, res) => {
+  const scope = req.params.scope;
+  const messageId = Number(req.params.messageId);
+  const emoji = String(req.body.emoji || '');
+  const message = getAccessibleMessage(scope, messageId, req.user);
+  if (!message) return res.status(404).json({ error:'消息不存在' });
+  if (message.is_recalled) return res.status(409).json({ error:'已撤回的消息不能回应' });
+  if (!allowedReactions.has(emoji)) return res.status(400).json({ error:'不支持该表情' });
+
+  const existing = db.prepare(`
+    SELECT 1 FROM message_reactions WHERE message_scope = ? AND message_id = ? AND user_id = ? AND emoji = ?
+  `).get(scope, messageId, req.user.id, emoji);
+  if (existing) {
+    db.prepare(`DELETE FROM message_reactions WHERE message_scope = ? AND message_id = ? AND user_id = ? AND emoji = ?`)
+      .run(scope, messageId, req.user.id, emoji);
+  } else {
+    db.prepare(`INSERT INTO message_reactions (message_scope, message_id, user_id, emoji) VALUES (?, ?, ?, ?)`)
+      .run(scope, messageId, req.user.id, emoji);
+  }
+  emitMessageChange(scope, message);
+  res.json({ ok:true, active:!existing });
+});
+
+app.post('/api/messages/:scope/:messageId/recall', requireAuth, (req, res) => {
+  const scope = req.params.scope;
+  const messageId = Number(req.params.messageId);
+  const table = messageTable(scope);
+  const message = getAccessibleMessage(scope, messageId, req.user);
+  if (!table || !message) return res.status(404).json({ error:'消息不存在' });
+  const senderId = scope === 'direct' ? message.from_user_id : message.user_id;
+  if (senderId !== req.user.id) return res.status(403).json({ error:'只能撤回自己发送的消息' });
+  db.prepare(`UPDATE ${table} SET is_recalled = 1, recalled_at = datetime('now') WHERE id = ?`).run(messageId);
+  db.prepare(`DELETE FROM message_reactions WHERE message_scope = ? AND message_id = ?`).run(scope, messageId);
+  emitMessageChange(scope, message);
+  res.json({ ok:true });
+});
+
+app.delete('/api/messages/:scope/:messageId', requireAuth, (req, res) => {
+  const scope = req.params.scope;
+  const messageId = Number(req.params.messageId);
+  const message = getAccessibleMessage(scope, messageId, req.user);
+  if (!message) return res.status(404).json({ error:'消息不存在' });
+  db.prepare(`
+    INSERT OR IGNORE INTO message_deletions (message_scope, message_id, user_id) VALUES (?, ?, ?)
+  `).run(scope, messageId, req.user.id);
+  io.to(`user:${req.user.id}`).emit('message:deleted', { scope, messageId, groupId:message.group_id || null });
+  res.json({ ok:true });
+});
+
 // ---------- Direct consultation ----------
 app.get('/api/direct/contacts', requireAuth, (req, res) => {
   res.json({ contacts: getDirectContacts(req.user).map(directContact) });
@@ -447,11 +730,13 @@ app.get('/api/direct/messages', requireAuth, (req, res) => {
     SELECT dm.*, u.nickname AS from_nickname
     FROM direct_messages dm
     JOIN users u ON u.id = dm.from_user_id
-    WHERE (dm.from_user_id = ? AND dm.to_user_id = ?)
-       OR (dm.from_user_id = ? AND dm.to_user_id = ?)
+    WHERE ((dm.from_user_id = ? AND dm.to_user_id = ?)
+       OR (dm.from_user_id = ? AND dm.to_user_id = ?))
+      AND NOT EXISTS (SELECT 1 FROM message_deletions md
+        WHERE md.message_scope = 'direct' AND md.message_id = dm.id AND md.user_id = ?)
     ORDER BY dm.id ASC
     LIMIT 500
-  `).all(req.user.id, otherUserId, otherUserId, req.user.id);
+  `).all(req.user.id, otherUserId, otherUserId, req.user.id, req.user.id);
 
   const lastIncoming = db.prepare(`
     SELECT COALESCE(MAX(id), 0) AS id FROM direct_messages
@@ -466,12 +751,13 @@ app.get('/api/direct/messages', requireAuth, (req, res) => {
   `).run(req.user.id, otherUserId, lastIncoming);
   io.to(`user:${req.user.id}`).emit('direct:read', { userId: otherUserId });
 
-  res.json({ messages: rows });
+  res.json({ messages: decorateMessages('direct', rows, req.user.id) });
 });
 
 app.post('/api/direct/messages', requireAuth, (req, res) => {
-  const content = cleanText(req.body.content);
-  if (!content) return res.status(400).json({ error: '消息不能为空' });
+  let payload;
+  try { payload = cleanMessagePayload(req.body, req.user); }
+  catch (err) { return res.status(err.status || 400).json({ error:err.message }); }
 
   const admin = getAdmin();
   if (!admin) return res.status(503).json({ error: '管理员尚未配置' });
@@ -486,19 +772,22 @@ app.post('/api/direct/messages', requireAuth, (req, res) => {
   }
 
   const info = db.prepare(`
-    INSERT INTO direct_messages (from_user_id, to_user_id, content)
-    VALUES (?, ?, ?)
-  `).run(req.user.id, toUserId, content);
+    INSERT INTO direct_messages (from_user_id, to_user_id, content, message_type, media_id, metadata)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(req.user.id, toUserId, payload.content, payload.messageType, payload.mediaId, payload.metadata);
 
-  const message = db.prepare(`
+  const rawMessage = db.prepare(`
     SELECT dm.*, u.nickname AS from_nickname
     FROM direct_messages dm JOIN users u ON u.id = dm.from_user_id
     WHERE dm.id = ?
   `).get(info.lastInsertRowid);
+  const message = decorateMessages('direct', [rawMessage], req.user.id)[0];
 
   io.to(`user:${req.user.id}`).to(`user:${toUserId}`).emit('direct:new', message);
+  const preview = payload.messageType === 'text' ? payload.content :
+    ({ image:'[图片]', video:'[视频]', audio:'[语音]', location:'[位置]' }[payload.messageType]);
   void sendPushToUsers([toUserId], {
-    title: `${req.user.nickname} 发来新咨询`, body: notificationPreview(content),
+    title: `${req.user.nickname} 发来新咨询`, body: notificationPreview(preview),
     tag: `direct-${req.user.id}`, url: `/?direct=${req.user.id}`
   }, 'direct', req.user.id).catch((err) => console.error('Web Push 处理失败:', err));
   res.json({ message });
@@ -637,36 +926,44 @@ app.get('/api/groups/:groupId/messages', requireAuth, (req, res) => {
     SELECT gm.*, u.nickname, u.is_admin
     FROM group_messages gm JOIN users u ON u.id = gm.user_id
     WHERE gm.group_id = ?
+      AND NOT EXISTS (SELECT 1 FROM message_deletions md
+        WHERE md.message_scope = 'group' AND md.message_id = gm.id AND md.user_id = ?)
     ORDER BY gm.id ASC
     LIMIT 500
-  `).all(groupId);
-  res.json({ messages: rows });
+  `).all(groupId, req.user.id);
+  res.json({ messages: decorateMessages('group', rows, req.user.id) });
 });
 
 app.post('/api/groups/:groupId/messages', requireAuth, (req, res) => {
   const groupId = Number(req.params.groupId);
-  const content = cleanText(req.body.content);
-  if (!content) return res.status(400).json({ error: '消息不能为空' });
+  let payload;
+  try { payload = cleanMessagePayload(req.body, req.user); }
+  catch (err) { return res.status(err.status || 400).json({ error:err.message }); }
 
   const member = isApprovedMember(groupId, req.user.id);
   if (!member && !req.user.is_admin) return res.status(403).json({ error: '你尚未加入该群' });
   if (!req.user.is_admin && isMuted(member)) return res.status(403).json({ error: `你已被禁言至 ${member.mute_until}` });
 
-  const info = db.prepare(`INSERT INTO group_messages (group_id, user_id, content) VALUES (?, ?, ?)`)
-    .run(groupId, req.user.id, content);
-  const message = db.prepare(`
+  const info = db.prepare(`
+    INSERT INTO group_messages (group_id, user_id, content, message_type, media_id, metadata)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(groupId, req.user.id, payload.content, payload.messageType, payload.mediaId, payload.metadata);
+  const rawMessage = db.prepare(`
     SELECT gm.*, u.nickname, u.is_admin
     FROM group_messages gm JOIN users u ON u.id = gm.user_id
     WHERE gm.id = ?
   `).get(info.lastInsertRowid);
+  const message = decorateMessages('group', [rawMessage], req.user.id)[0];
   io.to(`group:${groupId}`).emit('group:new', message);
   const group = db.prepare('SELECT name FROM groups WHERE id = ?').get(groupId);
   const recipients = db.prepare(`
     SELECT user_id FROM group_members
     WHERE group_id = ? AND status = 'approved' AND user_id != ?
   `).all(groupId, req.user.id).map((row) => row.user_id);
+  const preview = payload.messageType === 'text' ? payload.content :
+    ({ image:'[图片]', video:'[视频]', audio:'[语音]', location:'[位置]' }[payload.messageType]);
   void sendPushToUsers(recipients, {
-    title: group?.name || '粉丝交流群', body: notificationPreview(`${req.user.nickname}：${content}`),
+    title: group?.name || '粉丝交流群', body: notificationPreview(`${req.user.nickname}：${preview}`),
     tag: `group-${groupId}`, url: `/?group=${groupId}`
   }, 'group', groupId).catch((err) => console.error('Web Push 处理失败:', err));
   res.json({ message });
@@ -685,6 +982,14 @@ app.post('/api/groups/:groupId/messages/:messageId/pin', requireAuth, requireAdm
   tx();
   io.to(`group:${groupId}`).emit('group:pinned', { groupId, messageId });
   res.json({ ok: true });
+});
+
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = Number(err.status || err.statusCode) || 500;
+  if (status >= 500) console.error('请求处理失败:', err);
+  const message = err.type === 'entity.too.large' ? '上传文件过大' : (err.message || '服务器错误');
+  res.status(status).json({ error:message });
 });
 
 // ---------- Socket.IO ----------

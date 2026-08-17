@@ -12,7 +12,14 @@ const state = {
   pushEndpoint: null,
   directUnread: {},
   groupUnread: {},
-  pendingRoute: null
+  pendingRoute: null,
+  actionMessage: null,
+  pendingMedia: null,
+  recorder: null,
+  recordingStream: null,
+  recordingChunks: [],
+  recordingScope: null,
+  recordingTimer: null
 };
 
 function toast(message) {
@@ -249,6 +256,14 @@ function connectSocket() {
   state.socket.on('group:pinned', ({ groupId }) => {
     if (state.activeGroup?.id === groupId) loadGroupMessages(groupId);
   });
+  state.socket.on('message:updated', ({ scope, groupId }) => {
+    if (scope === 'direct' && state.currentPage === 'direct' && state.directContact) loadDirectMessages();
+    if (scope === 'group' && state.currentPage === 'groups' && state.activeGroup?.id === groupId) loadGroupMessages(groupId);
+  });
+  state.socket.on('message:deleted', ({ scope, groupId }) => {
+    if (scope === 'direct' && state.currentPage === 'direct' && state.directContact) loadDirectMessages();
+    if (scope === 'group' && state.currentPage === 'groups' && state.activeGroup?.id === groupId) loadGroupMessages(groupId);
+  });
   state.socket.on('group:approved', ({ groupId }) => {
     toast('你的入群申请已通过');
     state.socket.emit('group:join', groupId);
@@ -383,6 +398,7 @@ async function loadDirectMessages() {
     $('#directHeader').textContent = `与 ${state.directContact.nickname} 的对话`;
     $('#directForm').classList.remove('hidden');
     $('#directMessages').innerHTML = messages.map(m => messageHtml(m, m.from_user_id === state.me.id, false)).join('');
+    bindMessageInteractions($('#directMessages'), 'direct');
     scrollBottom($('#directMessages'));
   } catch (err) { toast(err.message); }
 }
@@ -392,10 +408,7 @@ $('#directForm').onsubmit = async (e) => {
   const content = $('#directInput').value.trim();
   if (!content || !state.directContact) return;
   try {
-    await api('/api/direct/messages', {
-      method:'POST',
-      body:JSON.stringify({ content, toUserId: state.me.isAdmin ? state.directContact.id : undefined })
-    });
+    await sendMessage('direct', { content });
     $('#directInput').value = '';
   } catch (err) { toast(err.message); }
 };
@@ -447,8 +460,9 @@ async function loadGroupMessages(groupId) {
     const { messages } = await api(`/api/groups/${groupId}/messages`);
     const pinned = messages.find(m => m.is_pinned);
     $('#pinnedMessage').classList.toggle('hidden', !pinned);
-    $('#pinnedMessage').innerHTML = pinned ? `📌 <strong>置顶：</strong>${escapeHtml(pinned.content)}` : '';
+    $('#pinnedMessage').innerHTML = pinned ? `📌 <strong>置顶：</strong>${escapeHtml(messageSummary(pinned))}` : '';
     $('#groupMessages').innerHTML = messages.map(m => messageHtml(m, m.user_id === state.me.id, true)).join('');
+    bindMessageInteractions($('#groupMessages'), 'group');
     $$('[data-pin-message]').forEach(btn => btn.onclick = async () => {
       try { await api(`/api/groups/${groupId}/messages/${btn.dataset.pinMessage}/pin`, { method:'POST' }); }
       catch (err) { toast(err.message); }
@@ -457,15 +471,137 @@ async function loadGroupMessages(groupId) {
   } catch (err) { toast(err.message); }
 }
 
-function messageHtml(m, mine, isGroup) {
-  const sender = isGroup ? (m.is_admin ? `${m.nickname} 🛡️` : m.nickname) : m.from_nickname;
-  return `<div class="message-row ${mine ? 'mine' : ''}">
-    <div class="bubble">
-      <div class="message-meta">${escapeHtml(sender || '')} · ${fmtTime(m.created_at)}</div>
-      <div>${escapeHtml(m.content)}</div>
-      ${isGroup && state.me.isAdmin ? `<div class="message-tools"><button class="small-btn" data-pin-message="${m.id}">📌 置顶</button></div>` : ''}
+function messageSummary(message) {
+  if (message.is_recalled) return '消息已撤回';
+  return ({ image:'[图片]', video:'[视频]', audio:'[语音]', location:'[位置]' }[message.message_type]) || message.content || '';
+}
+
+function messageContentHtml(message) {
+  if (message.is_recalled) return '<div class="message-body recalled-message">此消息已撤回</div>';
+  const url = escapeHtml(message.media_url || '');
+  const mimeType = escapeHtml(message.metadata?.mimeType || '');
+  if (message.message_type === 'image') {
+    return `<img class="message-media" src="${url}" alt="聊天图片" loading="lazy" />`;
+  }
+  if (message.message_type === 'video') {
+    return `<video class="message-media" controls playsinline preload="metadata"><source src="${url}" type="${mimeType}" />你的浏览器无法播放此视频。</video>`;
+  }
+  if (message.message_type === 'audio') {
+    return `<audio class="message-audio" controls preload="metadata" src="${url}">你的浏览器无法播放此语音。</audio>`;
+  }
+  if (message.message_type === 'location') {
+    const latitude = Number(message.metadata?.latitude);
+    const longitude = Number(message.metadata?.longitude);
+    const safeLatitude = Number.isFinite(latitude) ? latitude.toFixed(6) : '0';
+    const safeLongitude = Number.isFinite(longitude) ? longitude.toFixed(6) : '0';
+    const mapUrl = `https://www.openstreetmap.org/?mlat=${safeLatitude}&mlon=${safeLongitude}#map=16/${safeLatitude}/${safeLongitude}`;
+    return `<a class="location-card" href="${mapUrl}" target="_blank" rel="noopener noreferrer"><strong>📍 查看共享位置</strong><span>${safeLatitude}, ${safeLongitude}</span></a>`;
+  }
+  return `<div class="message-body">${escapeHtml(message.content)}</div>`;
+}
+
+function messageHtml(message, mine, isGroup) {
+  const sender = isGroup ? (message.is_admin ? `${message.nickname} 🛡️` : message.nickname) : message.from_nickname;
+  const reactions = (message.reactions || []).map(reaction => `
+    <button type="button" class="reaction-chip ${reaction.mine ? 'mine' : ''}" data-existing-reaction="${escapeHtml(reaction.emoji)}">${escapeHtml(reaction.emoji)} ${reaction.count}</button>
+  `).join('');
+  return `<div class="message-row ${mine ? 'mine' : ''}" data-message-id="${message.id}" data-message-mine="${mine ? '1' : '0'}" data-message-recalled="${message.is_recalled ? '1' : '0'}">
+    <div class="message-stack">
+      ${reactions ? `<div class="message-reactions">${reactions}</div>` : ''}
+      <div class="bubble" data-message-bubble>
+        <div class="message-meta">${escapeHtml(sender || '')} · ${fmtTime(message.created_at)}</div>
+        ${messageContentHtml(message)}
+        ${isGroup && state.me.isAdmin && !message.is_recalled ? `<div class="message-tools"><button type="button" class="small-btn" data-pin-message="${message.id}">📌 置顶</button></div>` : ''}
+      </div>
     </div>
   </div>`;
+}
+
+function openMessageActions(row, scope) {
+  state.actionMessage = {
+    scope,
+    id: Number(row.dataset.messageId),
+    mine: row.dataset.messageMine === '1',
+    recalled: row.dataset.messageRecalled === '1'
+  };
+  const canReact = !state.actionMessage.recalled;
+  $('.reaction-picker').classList.toggle('hidden', !canReact);
+  $('.action-title').textContent = canReact ? '回应这条消息' : '消息操作';
+  $('#recallMessage').classList.toggle('hidden', !state.actionMessage.mine || state.actionMessage.recalled);
+  $('#messageActions').classList.remove('hidden');
+}
+
+function closeMessageActions() {
+  $('#messageActions').classList.add('hidden');
+  state.actionMessage = null;
+}
+
+async function toggleReaction(scope, messageId, emoji) {
+  await api(`/api/messages/${scope}/${messageId}/reactions`, {
+    method:'POST', body:JSON.stringify({ emoji })
+  });
+}
+
+function bindMessageInteractions(container, scope) {
+  container.querySelectorAll('.message-row').forEach(row => {
+    const bubble = row.querySelector('[data-message-bubble]');
+    if (!bubble) return;
+    let timer = null;
+    let longPressed = false;
+    let startX = 0;
+    let startY = 0;
+    const cancel = () => { clearTimeout(timer); timer = null; };
+    bubble.addEventListener('pointerdown', (event) => {
+      if (event.button !== undefined && event.button !== 0) return;
+      if (event.target.closest('button')) return;
+      longPressed = false;
+      startX = event.clientX; startY = event.clientY;
+      timer = setTimeout(() => {
+        timer = null;
+        longPressed = true;
+        navigator.vibrate?.(25);
+        openMessageActions(row, scope);
+      }, 550);
+    });
+    bubble.addEventListener('pointermove', (event) => {
+      if (Math.abs(event.clientX - startX) > 10 || Math.abs(event.clientY - startY) > 10) cancel();
+    });
+    bubble.addEventListener('pointerup', cancel);
+    bubble.addEventListener('pointercancel', cancel);
+    bubble.addEventListener('pointerleave', cancel);
+    bubble.addEventListener('click', (event) => {
+      if (!longPressed) return;
+      event.preventDefault();
+      event.stopPropagation();
+      longPressed = false;
+    }, true);
+    bubble.addEventListener('contextmenu', (event) => {
+      if (event.target.closest('button')) return;
+      event.preventDefault();
+      cancel();
+      openMessageActions(row, scope);
+    });
+    row.querySelectorAll('[data-existing-reaction]').forEach(button => {
+      button.onclick = async () => {
+        try { await toggleReaction(scope, Number(row.dataset.messageId), button.dataset.existingReaction); }
+        catch (err) { toast(err.message); }
+      };
+    });
+  });
+}
+
+async function sendMessage(scope, payload) {
+  if (scope === 'direct') {
+    if (!state.directContact) throw new Error('请先选择联系人');
+    return api('/api/direct/messages', {
+      method:'POST',
+      body:JSON.stringify({ ...payload, toUserId:state.me.isAdmin ? state.directContact.id : undefined })
+    });
+  }
+  if (!state.activeGroup) throw new Error('请先进入群聊');
+  return api(`/api/groups/${state.activeGroup.id}/messages`, {
+    method:'POST', body:JSON.stringify(payload)
+  });
 }
 
 $('#groupForm').onsubmit = async (e) => {
@@ -473,10 +609,185 @@ $('#groupForm').onsubmit = async (e) => {
   const content = $('#groupInput').value.trim();
   if (!content || !state.activeGroup) return;
   try {
-    await api(`/api/groups/${state.activeGroup.id}/messages`, { method:'POST', body:JSON.stringify({ content }) });
+    await sendMessage('group', { content });
     $('#groupInput').value = '';
   } catch (err) { toast(err.message); }
 };
+
+function refreshActiveMessages(scope) {
+  if (scope === 'direct' && state.directContact) return loadDirectMessages();
+  if (scope === 'group' && state.activeGroup) return loadGroupMessages(state.activeGroup.id);
+  return Promise.resolve();
+}
+
+$('#messageActions').onclick = (event) => {
+  if (event.target === $('#messageActions')) closeMessageActions();
+};
+$('.action-sheet').onclick = (event) => event.stopPropagation();
+$('#closeMessageActions').onclick = closeMessageActions;
+$$('[data-reaction]').forEach(button => button.onclick = async () => {
+  const target = state.actionMessage;
+  if (!target) return;
+  closeMessageActions();
+  try {
+    await toggleReaction(target.scope, target.id, button.dataset.reaction);
+    await refreshActiveMessages(target.scope);
+  } catch (err) { toast(err.message); }
+});
+$('#recallMessage').onclick = async () => {
+  const target = state.actionMessage;
+  if (!target || !confirm('撤回后，聊天中的所有人都将无法再查看这条消息。确定撤回吗？')) return;
+  closeMessageActions();
+  try {
+    await api(`/api/messages/${target.scope}/${target.id}/recall`, { method:'POST' });
+    await refreshActiveMessages(target.scope);
+  } catch (err) { toast(err.message); }
+};
+$('#deleteMessage').onclick = async () => {
+  const target = state.actionMessage;
+  if (!target || !confirm('这条消息只会从你自己的聊天记录中删除，确定继续吗？')) return;
+  closeMessageActions();
+  try {
+    await api(`/api/messages/${target.scope}/${target.id}`, { method:'DELETE' });
+    await refreshActiveMessages(target.scope);
+  } catch (err) { toast(err.message); }
+};
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !$('#messageActions').classList.contains('hidden')) closeMessageActions();
+});
+
+async function uploadMedia(file) {
+  const res = await fetch('/api/media/upload', {
+    method:'POST',
+    headers:{ 'Content-Type':file.type, 'X-File-Name':encodeURIComponent(file.name || 'media') },
+    body:file
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '上传失败');
+  return data.media;
+}
+
+function mediaSizeLimit(type) {
+  return type === 'video' ? 50 * 1024 * 1024 : type === 'image' ? 12 * 1024 * 1024 : 15 * 1024 * 1024;
+}
+
+async function uploadAndSend(scope, type, file) {
+  if (!file?.size) throw new Error('请选择有效文件');
+  if (file.size > mediaSizeLimit(type)) {
+    throw new Error(type === 'video' ? '视频不能超过 50MB' : type === 'image' ? '图片不能超过 12MB' : '语音不能超过 15MB');
+  }
+  toast(type === 'video' ? '视频正在上传…' : type === 'image' ? '图片正在上传…' : '语音正在上传…');
+  const media = await uploadMedia(file);
+  await sendMessage(scope, { messageType:type, mediaId:media.id });
+  toast('发送成功');
+}
+
+const mediaPicker = $('#mediaPicker');
+mediaPicker.onchange = async () => {
+  const pending = state.pendingMedia;
+  const file = mediaPicker.files?.[0];
+  mediaPicker.value = '';
+  state.pendingMedia = null;
+  if (!pending || !file) return;
+  try { await uploadAndSend(pending.scope, pending.type, file); }
+  catch (err) { toast(err.message); }
+};
+
+function chooseMedia(scope, type) {
+  if (scope === 'direct' && !state.directContact) return toast('请先选择联系人');
+  if (scope === 'group' && !state.activeGroup) return toast('请先进入群聊');
+  state.pendingMedia = { scope, type };
+  mediaPicker.accept = type === 'image' ? 'image/jpeg,image/png,image/webp,image/gif' : 'video/mp4,video/webm,video/quicktime';
+  mediaPicker.click();
+}
+
+function resetRecordingUi() {
+  clearTimeout(state.recordingTimer);
+  state.recordingStream?.getTracks().forEach(track => track.stop());
+  $$('[data-rich-action="audio"]').forEach(button => {
+    button.classList.remove('recording');
+    button.textContent = '🎤 语音';
+  });
+  state.recorder = null;
+  state.recordingStream = null;
+  state.recordingScope = null;
+  state.recordingTimer = null;
+}
+
+async function startVoiceRecording(scope) {
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('当前浏览器不支持语音录制');
+  if (scope === 'direct' && !state.directContact) throw new Error('请先选择联系人');
+  if (scope === 'group' && !state.activeGroup) throw new Error('请先进入群聊');
+  const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+  const supportedType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg;codecs=opus']
+    .find(type => MediaRecorder.isTypeSupported(type));
+  let recorder;
+  try { recorder = new MediaRecorder(stream, supportedType ? { mimeType:supportedType } : undefined); }
+  catch (err) {
+    stream.getTracks().forEach(track => track.stop());
+    throw err;
+  }
+  state.recorder = recorder;
+  state.recordingStream = stream;
+  state.recordingChunks = [];
+  state.recordingScope = scope;
+  const button = document.querySelector(`[data-rich-action="audio"][data-scope="${scope}"]`);
+  button.classList.add('recording');
+  button.textContent = '⏹️ 停止录音';
+  recorder.ondataavailable = event => { if (event.data.size) state.recordingChunks.push(event.data); };
+  recorder.onstop = async () => {
+    const chunks = state.recordingChunks;
+    const recordingScope = state.recordingScope;
+    const mimeType = recorder.mimeType?.split(';')[0] || chunks[0]?.type?.split(';')[0] || 'audio/webm';
+    resetRecordingUi();
+    const blob = new Blob(chunks, { type:mimeType });
+    if (blob.size < 200) return toast('录音时间太短，请重新录制');
+    const extension = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : 'webm';
+    try { await uploadAndSend(recordingScope, 'audio', new File([blob], `voice-${Date.now()}.${extension}`, { type:mimeType })); }
+    catch (err) { toast(err.message); }
+  };
+  recorder.onerror = () => { resetRecordingUi(); toast('录音失败，请检查麦克风权限'); };
+  recorder.start(500);
+  state.recordingTimer = setTimeout(() => {
+    if (state.recorder?.state === 'recording') state.recorder.stop();
+  }, 60000);
+  toast('正在录音，再点一次“停止录音”即可发送');
+}
+
+async function toggleVoiceRecording(scope) {
+  if (state.recorder?.state === 'recording') {
+    state.recorder.stop();
+    return;
+  }
+  await startVoiceRecording(scope);
+}
+
+async function shareLocation(scope) {
+  if (!navigator.geolocation) throw new Error('当前浏览器不支持定位');
+  if (scope === 'direct' && !state.directContact) throw new Error('请先选择联系人');
+  if (scope === 'group' && !state.activeGroup) throw new Error('请先进入群聊');
+  toast('正在获取位置…');
+  const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {
+    enableHighAccuracy:true, timeout:15000, maximumAge:30000
+  }));
+  await sendMessage(scope, {
+    messageType:'location',
+    metadata:{ latitude:position.coords.latitude, longitude:position.coords.longitude, accuracy:position.coords.accuracy }
+  });
+  toast('位置已发送');
+}
+
+$$('[data-rich-action]').forEach(button => button.onclick = async () => {
+  const { scope, richAction } = button.dataset;
+  try {
+    if (richAction === 'image' || richAction === 'video') chooseMedia(scope, richAction);
+    else if (richAction === 'audio') await toggleVoiceRecording(scope);
+    else if (richAction === 'location') await shareLocation(scope);
+  } catch (err) {
+    const permissionMessage = err?.name === 'NotAllowedError' ? '权限被拒绝，请在浏览器的网站设置中允许麦克风或位置权限' : err.message;
+    toast(permissionMessage || '操作失败');
+  }
+});
 
 // Admin
 $('#createGroupForm').onsubmit = async (e) => {
