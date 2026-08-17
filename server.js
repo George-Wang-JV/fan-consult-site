@@ -47,6 +47,16 @@ CREATE TABLE IF NOT EXISTS direct_messages (
   FOREIGN KEY(to_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS direct_read_state (
+  user_id INTEGER NOT NULL,
+  other_user_id INTEGER NOT NULL,
+  last_read_message_id INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY(user_id, other_user_id),
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY(other_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS groups (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -91,6 +101,7 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_direct_pair ON direct_messages(from_user_id, to_user_id, id);
+CREATE INDEX IF NOT EXISTS idx_direct_recipient ON direct_messages(to_user_id, from_user_id, id);
 CREATE INDEX IF NOT EXISTS idx_group_messages ON group_messages(group_id, id);
 CREATE INDEX IF NOT EXISTS idx_group_member_status ON group_members(group_id, status);
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
@@ -213,6 +224,44 @@ function publicUser(row) {
     isAdmin: Boolean(row.is_admin),
     createdAt: row.created_at
   } : null;
+}
+
+function directContact(row) {
+  return {
+    ...publicUser(row),
+    unreadCount: Number(row.unread_count || 0),
+    lastMessageId: row.last_message_id ? Number(row.last_message_id) : null,
+    lastMessageContent: row.last_message_content || '',
+    lastMessageAt: row.last_message_at || null
+  };
+}
+
+function getDirectContacts(user) {
+  const admin = user.is_admin ? null : getAdmin();
+  if (!user.is_admin && !admin) return [];
+  const where = user.is_admin ? 'u.is_admin = 0' : 'u.id = ?';
+  return db.prepare(`
+    SELECT u.*,
+      (SELECT COUNT(*) FROM direct_messages incoming
+       WHERE incoming.from_user_id = u.id AND incoming.to_user_id = ?
+         AND incoming.id > COALESCE((SELECT drs.last_read_message_id FROM direct_read_state drs
+           WHERE drs.user_id = ? AND drs.other_user_id = u.id), 0)) AS unread_count,
+      (SELECT latest.id FROM direct_messages latest
+       WHERE (latest.from_user_id = ? AND latest.to_user_id = u.id)
+          OR (latest.from_user_id = u.id AND latest.to_user_id = ?)
+       ORDER BY latest.id DESC LIMIT 1) AS last_message_id,
+      (SELECT latest.content FROM direct_messages latest
+       WHERE (latest.from_user_id = ? AND latest.to_user_id = u.id)
+          OR (latest.from_user_id = u.id AND latest.to_user_id = ?)
+       ORDER BY latest.id DESC LIMIT 1) AS last_message_content,
+      (SELECT latest.created_at FROM direct_messages latest
+       WHERE (latest.from_user_id = ? AND latest.to_user_id = u.id)
+          OR (latest.from_user_id = u.id AND latest.to_user_id = ?)
+       ORDER BY latest.id DESC LIMIT 1) AS last_message_at
+    FROM users u
+    WHERE ${where}
+    ORDER BY (unread_count > 0) DESC, COALESCE(last_message_id, 0) DESC, u.created_at DESC
+  `).all(user.id, user.id, user.id, user.id, user.id, user.id, user.id, user.id, ...(user.is_admin ? [] : [admin.id]));
 }
 
 function currentUser(req) {
@@ -370,15 +419,15 @@ app.post('/api/push/test', requireAuth, async (req, res) => {
 
 // ---------- Direct consultation ----------
 app.get('/api/direct/contacts', requireAuth, (req, res) => {
-  if (req.user.is_admin) {
-    const rows = db.prepare(`
-      SELECT id, email, nickname, is_admin, created_at
-      FROM users WHERE is_admin = 0 ORDER BY created_at DESC
-    `).all();
-    return res.json({ contacts: rows.map(publicUser) });
-  }
-  const admin = getAdmin();
-  res.json({ contacts: admin ? [publicUser(admin)] : [] });
+  res.json({ contacts: getDirectContacts(req.user).map(directContact) });
+});
+
+app.get('/api/direct/unread', requireAuth, (req, res) => {
+  const contacts = getDirectContacts(req.user).map(directContact);
+  const unread = contacts
+    .filter((contact) => contact.unreadCount > 0)
+    .map((contact) => ({ userId: contact.id, count: contact.unreadCount }));
+  res.json({ unread, total: unread.reduce((sum, item) => sum + item.count, 0) });
 });
 
 app.get('/api/direct/messages', requireAuth, (req, res) => {
@@ -403,6 +452,19 @@ app.get('/api/direct/messages', requireAuth, (req, res) => {
     ORDER BY dm.id ASC
     LIMIT 500
   `).all(req.user.id, otherUserId, otherUserId, req.user.id);
+
+  const lastIncoming = db.prepare(`
+    SELECT COALESCE(MAX(id), 0) AS id FROM direct_messages
+    WHERE from_user_id = ? AND to_user_id = ?
+  `).get(otherUserId, req.user.id).id;
+  db.prepare(`
+    INSERT INTO direct_read_state (user_id, other_user_id, last_read_message_id)
+    VALUES (?, ?, ?)
+    ON CONFLICT(user_id, other_user_id) DO UPDATE SET
+      last_read_message_id = MAX(last_read_message_id, excluded.last_read_message_id),
+      updated_at = datetime('now')
+  `).run(req.user.id, otherUserId, lastIncoming);
+  io.to(`user:${req.user.id}`).emit('direct:read', { userId: otherUserId });
 
   res.json({ messages: rows });
 });

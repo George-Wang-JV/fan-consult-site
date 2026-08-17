@@ -56,7 +56,7 @@ async function showApp() {
   $('#meCard').innerHTML = `<strong>${escapeHtml(state.me.nickname)}</strong><br><span class="muted">${state.me.isAdmin ? '管理员' : '粉丝用户'}</span>`;
   $('#adminBtn').classList.toggle('hidden', !state.me.isAdmin);
   connectSocket();
-  await setupPush(false);
+  await Promise.all([setupPush(false), loadDirectUnread()]);
   await openInitialRoute();
 }
 
@@ -81,6 +81,20 @@ function clearGroupUnread(groupId) {
   delete state.groupUnread[groupId];
   renderUnread();
   document.querySelector(`[data-open-group="${groupId}"]`)?.closest('.group-card')?.querySelector('.unread-badge')?.remove();
+}
+
+async function loadDirectUnread() {
+  try {
+    const { unread } = await api('/api/direct/unread');
+    const serverUnread = Object.fromEntries(unread.map((item) => [item.userId, item.count]));
+    for (const [userId, count] of Object.entries(state.directUnread)) {
+      serverUnread[userId] = Math.max(serverUnread[userId] || 0, count);
+    }
+    state.directUnread = serverUnread;
+    renderUnread();
+  } catch (err) {
+    console.error('加载私聊未读数失败:', err);
+  }
 }
 
 function activeChat() {
@@ -208,7 +222,7 @@ async function openInitialRoute() {
 function connectSocket() {
   if (state.socket) state.socket.disconnect();
   state.socket = io();
-  state.socket.on('connect', updatePresence);
+  state.socket.on('connect', () => { updatePresence(); loadDirectUnread(); });
   state.socket.on('direct:new', (msg) => {
     const otherId = msg.from_user_id === state.me.id ? msg.to_user_id : msg.from_user_id;
     const chat = activeChat();
@@ -218,6 +232,10 @@ function connectSocket() {
       if (state.currentPage === 'direct') loadDirectContacts();
     }
     if (state.currentPage === 'direct' && state.directContact?.id === otherId) loadDirectMessages();
+  });
+  state.socket.on('direct:read', ({ userId }) => {
+    clearDirectUnread(userId);
+    if (state.currentPage === 'direct') loadDirectContacts();
   });
   state.socket.on('group:new', (msg) => {
     const chat = activeChat();
@@ -313,6 +331,15 @@ window.addEventListener('blur', updatePresence);
 async function loadDirectContacts() {
   try {
     const { contacts } = await api('/api/direct/contacts');
+    const contactIds = new Set(contacts.map((contact) => String(contact.id)));
+    for (const contact of contacts) {
+      state.directUnread[contact.id] = Math.max(state.directUnread[contact.id] || 0, contact.unreadCount || 0);
+      if (!state.directUnread[contact.id]) delete state.directUnread[contact.id];
+    }
+    for (const userId of Object.keys(state.directUnread)) {
+      if (!contactIds.has(String(userId))) delete state.directUnread[userId];
+    }
+    renderUnread();
     const box = $('#directContacts');
     if (!contacts.length) {
       box.innerHTML = '<div class="contact-item muted">暂无可用联系人</div>';
@@ -321,13 +348,13 @@ async function loadDirectContacts() {
     box.innerHTML = contacts.map(c => `
       <div class="contact-item ${state.directContact?.id === c.id ? 'active' : ''}" data-user-id="${c.id}">
         <div class="contact-name"><span>${escapeHtml(c.nickname)} ${c.isAdmin ? '🛡️' : ''}</span>${state.directUnread[c.id] ? `<span class="unread-badge">${state.directUnread[c.id]}</span>` : ''}</div>
-        <div class="contact-meta">${escapeHtml(c.email)}</div>
+        <div class="contact-meta">${c.lastMessageContent ? `${escapeHtml(c.lastMessageContent.slice(0, 38))}${c.lastMessageContent.length > 38 ? '…' : ''} · ${fmtTime(c.lastMessageAt)}` : escapeHtml(c.email)}</div>
       </div>`).join('');
-    $$('#directContacts .contact-item[data-user-id]').forEach(el => el.onclick = () => {
+    $$('#directContacts .contact-item[data-user-id]').forEach(el => el.onclick = async () => {
       state.directContact = contacts.find(c => c.id === Number(el.dataset.userId));
       clearDirectUnread(state.directContact.id);
-      loadDirectContacts();
-      loadDirectMessages();
+      await loadDirectMessages();
+      await loadDirectContacts();
       updatePresence();
     });
     if (!state.directContact && contacts.length === 1) {
@@ -337,7 +364,13 @@ async function loadDirectContacts() {
     if (state.pendingRoute?.type === 'direct') {
       const target = contacts.find(c => c.id === state.pendingRoute.id);
       state.pendingRoute = null;
-      if (target) { state.directContact = target; clearDirectUnread(target.id); loadDirectContacts(); loadDirectMessages(); updatePresence(); }
+      if (target) {
+        state.directContact = target;
+        clearDirectUnread(target.id);
+        await loadDirectMessages();
+        await loadDirectContacts();
+        updatePresence();
+      }
     }
   } catch (err) { toast(err.message); }
 }
