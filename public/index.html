@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>粉丝咨询中心</title>
   <link rel="stylesheet" href="/styles.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -61,6 +64,7 @@
             <button class="secondary" data-goto="groups">查看群聊</button>
             <button id="enableNotifications" class="secondary">🔔 开启新消息通知</button>
           </div>
+          <p id="notificationStatus" class="notification-status muted" aria-live="polite">点击开启后，浏览器会请求通知权限。</p>
         </div>
       </div>
 

@@ -38,6 +38,9 @@ textarea { min-height: 90px; resize: vertical; }
 .nav-btn:hover, .nav-btn.active { background: rgba(255,255,255,.10); color: #fff; }
 .unread-badge { display: inline-flex; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 5px; align-items: center; justify-content: center; border-radius: 999px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; vertical-align: middle; }
 .contact-name, .group-card h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.notification-status { margin: 14px 0 0; font-size: 14px; }
+.notification-status.success { color: #047857; }
+.notification-status.error { color: #b91c1c; font-weight: 600; }
 .sidebar .ghost { margin-top: auto; color: #d1d5db; padding: 10px; }
 .content { min-width: 0; }
 .topbar { height: 70px; display: flex; align-items: center; gap: 12px; padding: 0 28px; background: #fff; border-bottom: 1px solid #e5e7eb; }

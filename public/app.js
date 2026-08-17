@@ -71,6 +71,18 @@ function renderUnread() {
   setBadge('#groupUnread', totalUnread(state.groupUnread));
 }
 
+function clearDirectUnread(userId) {
+  delete state.directUnread[userId];
+  renderUnread();
+  document.querySelector(`[data-user-id="${userId}"] .unread-badge`)?.remove();
+}
+
+function clearGroupUnread(groupId) {
+  delete state.groupUnread[groupId];
+  renderUnread();
+  document.querySelector(`[data-open-group="${groupId}"]`)?.closest('.group-card')?.querySelector('.unread-badge')?.remove();
+}
+
 function activeChat() {
   if (document.visibilityState !== 'visible' || !document.hasFocus()) return null;
   if (state.currentPage === 'direct' && state.directContact) return { chatType:'direct', chatId:state.directContact.id };
@@ -95,29 +107,88 @@ function urlBase64ToUint8Array(value) {
   return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
 }
 
+function setNotificationStatus(message, type = '') {
+  const status = $('#notificationStatus');
+  status.textContent = message;
+  status.className = `notification-status ${type}`.trim();
+}
+
+function isIosDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function isStandaloneApp() {
+  return navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+}
+
+function subscriptionUsesKey(subscription, publicKey) {
+  const currentKey = subscription?.options?.applicationServerKey;
+  if (!currentKey) return true;
+  const expected = urlBase64ToUint8Array(publicKey);
+  const current = new Uint8Array(currentKey);
+  return current.length === expected.length && current.every((value, index) => value === expected[index]);
+}
+
 async function setupPush(requestPermission) {
   const button = $('#enableNotifications');
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    button.textContent = '此浏览器不支持通知'; button.disabled = true; return;
+  if (!window.isSecureContext) {
+    button.textContent = '需要 HTTPS'; button.disabled = true;
+    setNotificationStatus('新消息通知只能在 HTTPS 网站上开启。', 'error'); return;
   }
+  if (isIosDevice() && !isStandaloneApp()) {
+    button.textContent = '请先添加到主屏幕'; button.disabled = true;
+    setNotificationStatus('iPhone/iPad：请用 Safari 的“分享 → 添加到主屏幕”，再从主屏幕打开本站并开启通知。', 'error'); return;
+  }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    button.textContent = '此浏览器不支持通知'; button.disabled = true;
+    setNotificationStatus('当前浏览器不支持 Web Push，请使用最新版 Chrome、Edge 或 Safari。', 'error'); return;
+  }
+
+  button.disabled = true;
+  button.textContent = '正在开启…';
+  setNotificationStatus(requestPermission ? '正在请求通知权限…' : '正在检查通知状态…');
   try {
-    const registration = await navigator.serviceWorker.register('/sw.js');
-    if (requestPermission && Notification.permission === 'default') await Notification.requestPermission();
-    if (Notification.permission !== 'granted') {
-      button.textContent = Notification.permission === 'denied' ? '通知已被浏览器禁止' : '🔔 开启新消息通知';
-      button.disabled = Notification.permission === 'denied'; return;
+    // Permission must be requested before any await so mobile browsers retain the click gesture.
+    let permission = Notification.permission;
+    if (requestPermission && permission === 'default') permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      const denied = permission === 'denied';
+      button.textContent = denied ? '通知已被浏览器禁止' : '🔔 开启新消息通知';
+      button.disabled = denied;
+      setNotificationStatus(denied ? '通知权限已被禁止，请在浏览器的网站设置中改为“允许”。' : '尚未允许通知，请点击按钮开启。', denied ? 'error' : '');
+      return;
     }
+
+    setNotificationStatus('正在注册后台通知服务…');
+    const registration = await navigator.serviceWorker.register('/sw.js', { updateViaCache:'none' });
+    await registration.update().catch(() => {});
+    await navigator.serviceWorker.ready;
     const { publicKey } = await api('/api/push/public-key');
     let subscription = await registration.pushManager.getSubscription();
+    if (subscription && !subscriptionUsesKey(subscription, publicKey)) {
+      const oldEndpoint = subscription.endpoint;
+      await subscription.unsubscribe();
+      await api('/api/push/unsubscribe', { method:'POST', body:JSON.stringify({ endpoint:oldEndpoint }) }).catch(() => {});
+      subscription = null;
+    }
     if (!subscription) subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey)
     });
     await api('/api/push/subscribe', { method:'POST', body:JSON.stringify({ subscription:subscription.toJSON() }) });
     state.pushEndpoint = subscription.endpoint;
     button.textContent = '✓ 新消息通知已开启'; button.disabled = true;
+    setNotificationStatus('新消息通知已开启。', 'success');
     updatePresence();
+    if (requestPermission) {
+      setNotificationStatus('订阅成功，正在发送一条测试通知…');
+      await api('/api/push/test', { method:'POST' });
+      setNotificationStatus('通知已开启，测试通知已发送。', 'success');
+    }
   } catch (err) {
-    if (requestPermission) toast(err.message || '开启通知失败');
+    const message = err.message || '开启通知失败';
+    button.textContent = '🔔 重试开启通知'; button.disabled = false;
+    setNotificationStatus(message, 'error');
+    if (requestPermission) toast(message);
   }
 }
 
@@ -231,6 +302,9 @@ $$('.nav-btn').forEach(btn => btn.onclick = () => goPage(btn.dataset.page));
 $$('[data-goto]').forEach(btn => btn.onclick = () => goPage(btn.dataset.goto));
 $('#mobileMenu').onclick = () => $('.sidebar').classList.toggle('open');
 $('#enableNotifications').onclick = () => setupPush(true);
+navigator.serviceWorker?.addEventListener('message', (event) => {
+  if (event.data?.type === 'push-subscription-changed') setupPush(false);
+});
 document.addEventListener('visibilitychange', updatePresence);
 window.addEventListener('focus', updatePresence);
 window.addEventListener('blur', updatePresence);
@@ -251,7 +325,7 @@ async function loadDirectContacts() {
       </div>`).join('');
     $$('#directContacts .contact-item[data-user-id]').forEach(el => el.onclick = () => {
       state.directContact = contacts.find(c => c.id === Number(el.dataset.userId));
-      delete state.directUnread[state.directContact.id]; renderUnread();
+      clearDirectUnread(state.directContact.id);
       loadDirectContacts();
       loadDirectMessages();
       updatePresence();
@@ -263,7 +337,7 @@ async function loadDirectContacts() {
     if (state.pendingRoute?.type === 'direct') {
       const target = contacts.find(c => c.id === state.pendingRoute.id);
       state.pendingRoute = null;
-      if (target) { state.directContact = target; delete state.directUnread[target.id]; renderUnread(); loadDirectContacts(); loadDirectMessages(); updatePresence(); }
+      if (target) { state.directContact = target; clearDirectUnread(target.id); loadDirectContacts(); loadDirectMessages(); updatePresence(); }
     }
   } catch (err) { toast(err.message); }
 }
@@ -328,7 +402,7 @@ async function openGroup(groupId) {
   state.activeGroup = state.groups.find(g => g.id === groupId) || { id: groupId, name:'群聊' };
   $('#groupChat').classList.remove('hidden');
   $('#groupHeader').textContent = state.activeGroup.name;
-  delete state.groupUnread[groupId]; renderUnread();
+  clearGroupUnread(groupId);
   state.socket?.emit('group:join', groupId);
   await loadGroupMessages(groupId);
   updatePresence();

@@ -1,3 +1,6 @@
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+
 self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data?.json() || {}; } catch { data = { body: event.data?.text() || '你有一条新消息' }; }
@@ -7,6 +10,12 @@ self.addEventListener('push', (event) => {
     renotify: true,
     data: { url: data.url || '/' }
   }));
+});
+
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(self.clients.matchAll({ type:'window', includeUncontrolled:true }).then((windows) =>
+    Promise.all(windows.map((client) => client.postMessage({ type:'push-subscription-changed' })))
+  ));
 });
 
 self.addEventListener('notificationclick', (event) => {

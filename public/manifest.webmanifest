@@ -1,0 +1,9 @@
+{
+  "name": "粉丝咨询中心",
+  "short_name": "咨询中心",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#111827"
+}

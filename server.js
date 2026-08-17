@@ -112,27 +112,37 @@ function notificationPreview(content, max = 180) {
 }
 
 async function sendPushToUsers(userIds, notification, chatType, chatId) {
-  if (!pushEnabled || !userIds.length) return;
+  const stats = { subscriptions: 0, sent: 0, skipped: 0, expired: 0, failed: 0, errors: [] };
+  if (!pushEnabled || !userIds.length) return stats;
   const placeholders = userIds.map(() => '?').join(',');
   const subscriptions = db.prepare(`SELECT * FROM push_subscriptions WHERE user_id IN (${placeholders})`).all(...userIds);
+  stats.subscriptions = subscriptions.length;
   const payload = JSON.stringify(notification);
 
   await Promise.allSettled(subscriptions.map(async (row) => {
-    if (isViewingChat(row.endpoint, chatType, chatId)) return;
+    if (isViewingChat(row.endpoint, chatType, chatId)) {
+      stats.skipped += 1;
+      return;
+    }
     try {
       await webpush.sendNotification({
         endpoint: row.endpoint,
         keys: { p256dh: row.p256dh, auth: row.auth }
       }, payload, { TTL: 60 * 60, urgency: 'high' });
+      stats.sent += 1;
     } catch (err) {
       if (err.statusCode === 404 || err.statusCode === 410) {
         db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(row.endpoint);
         endpointPresence.delete(row.endpoint);
+        stats.expired += 1;
         return;
       }
+      stats.failed += 1;
+      stats.errors.push(String(err.statusCode || err.message || '未知错误').slice(0, 160));
       console.error('Web Push 发送失败:', err.statusCode || err.message);
     }
   }));
+  return stats;
 }
 
 function seedAdmin() {
@@ -307,6 +317,11 @@ app.get('/api/push/public-key', requireAuth, (req, res) => {
   res.json({ publicKey: vapidPublicKey });
 });
 
+app.get('/api/push/status', requireAuth, (req, res) => {
+  const subscriptions = db.prepare('SELECT COUNT(*) AS count FROM push_subscriptions WHERE user_id = ?').get(req.user.id).count;
+  res.json({ configured: pushEnabled, subscriptions });
+});
+
 app.post('/api/push/subscribe', requireAuth, (req, res) => {
   const subscription = req.body.subscription;
   const endpoint = String(subscription?.endpoint || '').trim();
@@ -333,6 +348,24 @@ app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
     endpointPresence.delete(endpoint);
   }
   res.json({ ok: true });
+});
+
+app.post('/api/push/test', requireAuth, async (req, res) => {
+  if (!pushEnabled) return res.status(503).json({ error: '服务器尚未配置 VAPID 密钥' });
+  try {
+    const stats = await sendPushToUsers([req.user.id], {
+      title: '通知测试成功',
+      body: '你的浏览器已经可以接收新消息通知。',
+      tag: `push-test-${Date.now()}`,
+      url: '/'
+    }, 'test', 0);
+    if (!stats.subscriptions) return res.status(409).json({ error: '当前设备尚未完成 Push 订阅', stats });
+    if (!stats.sent) return res.status(502).json({ error: `测试通知发送失败${stats.errors[0] ? `（${stats.errors[0]}）` : ''}`, stats });
+    res.json({ ok: true, stats });
+  } catch (err) {
+    console.error('Web Push 测试失败:', err);
+    res.status(500).json({ error: `测试通知失败：${err.message}` });
+  }
 });
 
 // ---------- Direct consultation ----------
