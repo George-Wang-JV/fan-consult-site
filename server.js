@@ -825,7 +825,36 @@ app.post('/api/groups', requireAuth, requireAdmin, (req, res) => {
   });
 
   const groupId = create();
-  res.json({ group: db.prepare('SELECT * FROM groups WHERE id = ?').get(groupId) });
+  const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(groupId);
+  io.emit('group:created', { group });
+  res.json({ group });
+});
+
+app.patch('/api/groups/:groupId', requireAuth, requireAdmin, (req, res) => {
+  const groupId = Number(req.params.groupId);
+  const name = cleanText(req.body.name, 40);
+  const description = cleanText(req.body.description, 200) || '';
+  if (!Number.isInteger(groupId) || groupId < 1) return res.status(400).json({ error: '群聊参数无效' });
+  if (!name) return res.status(400).json({ error: '群名称不能为空' });
+
+  const info = db.prepare('UPDATE groups SET name = ?, description = ? WHERE id = ?')
+    .run(name, description, groupId);
+  if (!info.changes) return res.status(404).json({ error: '群不存在' });
+
+  const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(groupId);
+  io.emit('group:updated', { group });
+  res.json({ group });
+});
+
+app.delete('/api/groups/:groupId', requireAuth, requireAdmin, (req, res) => {
+  const groupId = Number(req.params.groupId);
+  if (!Number.isInteger(groupId) || groupId < 1) return res.status(400).json({ error: '群聊参数无效' });
+  const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(groupId);
+  if (!group) return res.status(404).json({ error: '群不存在' });
+
+  db.prepare('DELETE FROM groups WHERE id = ?').run(groupId);
+  io.emit('group:deleted', { groupId, name: group.name });
+  res.json({ ok: true });
 });
 
 app.post('/api/groups/:groupId/join', requireAuth, (req, res) => {
@@ -975,13 +1004,14 @@ app.post('/api/groups/:groupId/messages/:messageId/pin', requireAuth, requireAdm
   const target = db.prepare('SELECT * FROM group_messages WHERE id = ? AND group_id = ?').get(messageId, groupId);
   if (!target) return res.status(404).json({ error: '消息不存在' });
 
+  const shouldPin = !target.is_pinned;
   const tx = db.transaction(() => {
     db.prepare('UPDATE group_messages SET is_pinned = 0 WHERE group_id = ?').run(groupId);
-    db.prepare('UPDATE group_messages SET is_pinned = 1 WHERE id = ?').run(messageId);
+    if (shouldPin) db.prepare('UPDATE group_messages SET is_pinned = 1 WHERE id = ?').run(messageId);
   });
   tx();
-  io.to(`group:${groupId}`).emit('group:pinned', { groupId, messageId });
-  res.json({ ok: true });
+  io.to(`group:${groupId}`).emit('group:pinned', { groupId, messageId: shouldPin ? messageId : null });
+  res.json({ ok: true, pinned: shouldPin });
 });
 
 app.use((err, req, res, next) => {

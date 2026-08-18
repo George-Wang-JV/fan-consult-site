@@ -24,8 +24,124 @@ const state = {
   imageViewerName: null,
   imageViewerScale: 1,
   imageViewerBaseWidth: 0,
-  imageViewerBaseHeight: 0
+  imageViewerBaseHeight: 0,
+  languagePreference: localStorage.getItem('uiLanguage') || 'zh-CN',
+  language: 'zh-CN',
+  theme: localStorage.getItem('uiTheme') === 'dark' ? 'dark' : 'light'
 };
+
+const translations = {
+  'zh-CN': {
+    authDescription:'注册后可进行一对一咨询，并申请加入粉丝交流群。', login:'登录', register:'注册',
+    email:'邮箱', password:'密码', nickname:'昵称', createAccount:'创建账号', home:'我的主页',
+    direct:'一对一咨询', groups:'粉丝交流群', admin:'管理后台', logout:'退出登录', followSystem:'跟随系统',
+    homeDescription:'没有审核，畅所欲言', startConsultation:'开始咨询', viewGroups:'查看群聊',
+    enableNotifications:'开启新消息通知', notificationHint:'点击开启后，浏览器会请求通知权限。',
+    referralTitle:'使用我的邀请码注册享受返佣！', registerNow:'点我注册', selectContact:'请选择联系人',
+    messagePlaceholder:'输入消息…', groupMessagePlaceholder:'发送群消息…', send:'发送', createGroup:'创建粉丝群',
+    groupName:'群名称', description:'简介', createGroupChat:'创建群聊', groupManagement:'群管理',
+    saveChanges:'保存修改', dissolveGroup:'解散群聊', pendingRequests:'待审核申请', groupMembers:'群成员',
+    roleAdmin:'管理员', roleFan:'粉丝用户', noContacts:'暂无可用联系人', conversationWith:'与 {name} 的对话',
+    enterGroup:'进入群聊', waitingReview:'等待审核', requestJoin:'申请加入', noDescription:'暂无简介',
+    memberCount:'{count} 位成员', noGroups:'目前还没有群聊。', joinSubmitted:'入群申请已提交',
+    pinned:'置顶', unpin:'取消置顶', pinnedLabel:'置顶', recalled:'消息已撤回', image:'[图片]', video:'[视频]',
+    audio:'[语音]', location:'[位置]', noAdminGroups:'暂无群聊', manage:'管理', manageNamed:'管理：{name}',
+    approve:'通过', reject:'拒绝', noRequests:'暂无待审核申请', normal:'正常', mutedUntil:'禁言至 {time}',
+    muteHour:'禁言1小时', unmute:'解除禁言', remove:'踢出', operationSuccess:'操作成功', groupCreated:'群聊已创建',
+    groupSaved:'群聊资料已更新', groupDissolved:'群聊已解散', confirmDissolve:'确定要解散“{name}”吗？群成员和聊天记录将无法恢复。',
+    confirmKick:'确定要把该用户踢出群聊吗？', groupUpdated:'群聊资料已更新', groupRemoved:'该群聊已被解散',
+    themeDark:'切换深色模式', themeLight:'切换亮色模式', language:'切换语言', openMenu:'打开菜单', closeMenu:'关闭菜单',
+    moreWays:'更多发送方式', photo:'照片', videoLabel:'视频', voice:'语音', stopRecording:'停止录音', locationLabel:'位置', replyMessage:'回应这条消息',
+    recallAll:'撤回（所有人不可见）', deleteSelf:'删除（仅自己不可见）', cancel:'取消', fitScreen:'适应屏幕', download:'下载',
+    requiresHttps:'需要 HTTPS', httpsOnly:'新消息通知只能在 HTTPS 网站上开启。', addHomeScreen:'请先添加到主屏幕',
+    iosPushHint:'iPhone/iPad：请用 Safari 的“分享 → 添加到主屏幕”，再从主屏幕打开本站并开启通知。',
+    notificationsUnsupported:'此浏览器不支持通知', notificationsUnsupportedHint:'当前浏览器不支持 Web Push，请使用最新版 Chrome、Edge 或 Safari。',
+    enabling:'正在开启…', requestingPermission:'正在请求通知权限…', checkingNotifications:'正在检查通知状态…',
+    notificationsBlocked:'通知已被浏览器禁止', notificationsBlockedHint:'通知权限已被禁止，请在浏览器的网站设置中改为“允许”。',
+    notificationsNotAllowed:'尚未允许通知，请点击按钮开启。', registeringPush:'正在注册后台通知服务…', notificationsEnabled:'新消息通知已开启。',
+    testingPush:'订阅成功，正在发送一条测试通知…', testSent:'通知已开启，测试通知已发送。', retryNotifications:'重试开启通知', notificationFailed:'开启通知失败',
+    morningEarly:'早上', morning:'上午', afternoon:'下午', evening:'晚上'
+  },
+  en: {
+    authDescription:'Register to start one-to-one consultations and request access to fan groups.', login:'Log in', register:'Register',
+    email:'Email', password:'Password', nickname:'Nickname', createAccount:'Create account', home:'Home',
+    direct:'One-to-one', groups:'Fan groups', admin:'Admin', logout:'Log out', followSystem:'Use system language',
+    homeDescription:'No review — speak freely.', startConsultation:'Start consultation', viewGroups:'View groups',
+    enableNotifications:'Enable notifications', notificationHint:'Click Enable to allow browser notifications.',
+    referralTitle:'Register with my invitation link to enjoy rebates!', registerNow:'Register now', selectContact:'Select a contact',
+    messagePlaceholder:'Type a message…', groupMessagePlaceholder:'Send a group message…', send:'Send', createGroup:'Create fan group',
+    groupName:'Group name', description:'Description', createGroupChat:'Create group', groupManagement:'Group management',
+    saveChanges:'Save changes', dissolveGroup:'Dissolve group', pendingRequests:'Pending requests', groupMembers:'Group members',
+    roleAdmin:'Administrator', roleFan:'Fan user', noContacts:'No contacts available', conversationWith:'Conversation with {name}',
+    enterGroup:'Enter group', waitingReview:'Pending review', requestJoin:'Request to join', noDescription:'No description',
+    memberCount:'{count} members', noGroups:'There are no groups yet.', joinSubmitted:'Your request has been submitted',
+    pinned:'Pin', unpin:'Unpin', pinnedLabel:'Pinned', recalled:'Message recalled', image:'[Image]', video:'[Video]',
+    audio:'[Audio]', location:'[Location]', noAdminGroups:'No groups yet', manage:'Manage', manageNamed:'Manage: {name}',
+    approve:'Approve', reject:'Reject', noRequests:'No pending requests', normal:'Active', mutedUntil:'Muted until {time}',
+    muteHour:'Mute 1 hour', unmute:'Unmute', remove:'Remove', operationSuccess:'Done', groupCreated:'Group created',
+    groupSaved:'Group details updated', groupDissolved:'Group dissolved', confirmDissolve:'Dissolve “{name}”? Members and chat history cannot be restored.',
+    confirmKick:'Remove this user from the group?', groupUpdated:'Group details updated', groupRemoved:'This group has been dissolved',
+    themeDark:'Switch to dark mode', themeLight:'Switch to light mode', language:'Change language', openMenu:'Open menu', closeMenu:'Close menu',
+    moreWays:'More ways to send', photo:'Photo', videoLabel:'Video', voice:'Voice', stopRecording:'Stop recording', locationLabel:'Location', replyMessage:'React to this message',
+    recallAll:'Recall for everyone', deleteSelf:'Delete for me', cancel:'Cancel', fitScreen:'Fit to screen', download:'Download',
+    requiresHttps:'HTTPS required', httpsOnly:'Notifications can only be enabled on an HTTPS website.', addHomeScreen:'Add to Home Screen first',
+    iosPushHint:'On iPhone/iPad, open this site in Safari, choose Share → Add to Home Screen, then open it from the Home Screen and enable notifications.',
+    notificationsUnsupported:'Notifications unsupported', notificationsUnsupportedHint:'This browser does not support Web Push. Use the latest Chrome, Edge, or Safari.',
+    enabling:'Enabling…', requestingPermission:'Requesting notification permission…', checkingNotifications:'Checking notification status…',
+    notificationsBlocked:'Notifications are blocked', notificationsBlockedHint:'Notifications are blocked. Change this site’s browser permission to Allow.',
+    notificationsNotAllowed:'Notifications have not been allowed. Click the button to enable them.', registeringPush:'Registering the background notification service…', notificationsEnabled:'Notifications are enabled.',
+    testingPush:'Subscription saved. Sending a test notification…', testSent:'Notifications enabled and test sent.', retryNotifications:'Retry notifications', notificationFailed:'Could not enable notifications',
+    morningEarly:'early morning', morning:'morning', afternoon:'afternoon', evening:'evening'
+  }
+};
+
+function resolveLanguage(preference = state.languagePreference) {
+  if (preference === 'auto') return navigator.language?.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
+  return preference === 'en' ? 'en' : 'zh-CN';
+}
+
+function tr(key, values = {}) {
+  let output = translations[state.language]?.[key] || translations['zh-CN'][key] || key;
+  for (const [name, value] of Object.entries(values)) output = output.replaceAll(`{${name}}`, String(value));
+  return output;
+}
+
+function applyLanguage(preference = state.languagePreference, rerender = true) {
+  state.languagePreference = preference;
+  state.language = resolveLanguage(preference);
+  localStorage.setItem('uiLanguage', preference);
+  document.documentElement.lang = state.language;
+  $$('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n); });
+  $$('[data-i18n-placeholder]').forEach(el => { el.placeholder = tr(el.dataset.i18nPlaceholder); });
+  $$('[data-rich-action]').forEach(button => {
+    if (button.classList.contains('recording')) return;
+    const labels = { image:`📷 ${tr('photo')}`, video:`🎬 ${tr('videoLabel')}`, audio:`🎤 ${tr('voice')}`, location:`📍 ${tr('locationLabel')}` };
+    button.textContent = labels[button.dataset.richAction];
+  });
+  $('#languageButton').title = tr('language');
+  $('#languageButton').setAttribute('aria-label', tr('language'));
+  $('#mobileMenu').setAttribute('aria-label', tr('openMenu'));
+  $$('[data-language]').forEach(button => button.classList.toggle('active', button.dataset.language === preference));
+  if (!rerender || !state.me) return;
+  renderHomeGreeting();
+  renderMeCard();
+  $('#pageTitle').textContent = tr(state.currentPage);
+  if (state.currentPage === 'direct') loadDirectContacts();
+  if (state.currentPage === 'groups') state.activeGroup ? loadGroupMessages(state.activeGroup.id) : loadGroups();
+  if (state.currentPage === 'admin') loadAdminGroups();
+  setupPush(false);
+}
+
+function applyTheme(theme = state.theme) {
+  state.theme = theme === 'dark' ? 'dark' : 'light';
+  localStorage.setItem('uiTheme', state.theme);
+  document.documentElement.dataset.theme = state.theme;
+  const dark = state.theme === 'dark';
+  $('#themeToggle').textContent = dark ? '☀️' : '🌙';
+  $('#themeToggle').title = tr(dark ? 'themeLight' : 'themeDark');
+  $('#themeToggle').setAttribute('aria-label', tr(dark ? 'themeLight' : 'themeDark'));
+  $('#themeColor').content = dark ? '#0b1120' : '#f5f7fb';
+}
 
 function toast(message) {
   const el = $('#toast');
@@ -57,22 +173,34 @@ function escapeHtml(value) {
   }[c]));
 }
 
-function beijingGreeting() {
+function beijingGreetingPeriod() {
   const hour = Number(new Intl.DateTimeFormat('en-US', {
     timeZone:'Asia/Shanghai', hour:'2-digit', hourCycle:'h23'
   }).format(new Date()));
-  if (hour >= 5 && hour < 9) return '早上';
-  if (hour >= 9 && hour < 12) return '上午';
-  if (hour >= 12 && hour < 18) return '下午';
-  return '晚上';
+  if (hour >= 5 && hour < 9) return 'morningEarly';
+  if (hour >= 9 && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 18) return 'afternoon';
+  return 'evening';
 }
 
 function renderHomeGreeting() {
   if (!state.me) return;
   const nickname = `<strong>${escapeHtml(state.me.nickname)}</strong>`;
+  const period = tr(beijingGreetingPeriod());
+  if (state.language === 'en') {
+    const role = state.me.isAdmin ? ' Administrator' : '';
+    const destination = state.me.isAdmin ? 'the 废慨VC Consultation Center admin portal' : 'the 废慨VC Consultation Center';
+    $('#homeGreeting').innerHTML = `Good ${period}, respected ${nickname}${role}. Welcome to ${destination}.`;
+    return;
+  }
   const adminTitle = state.me.isAdmin ? ' 管理员' : '';
   const destination = state.me.isAdmin ? '废慨vc咨询中心后台' : '废慨vc咨询中心';
-  $('#homeGreeting').innerHTML = `尊敬的 ${nickname}${adminTitle}，北京时间${beijingGreeting()}好，欢迎来到${destination}。`;
+  $('#homeGreeting').innerHTML = `尊敬的 ${nickname}${adminTitle}，北京时间${period}好，欢迎来到${destination}。`;
+}
+
+function renderMeCard() {
+  if (!state.me) return;
+  $('#meCard').innerHTML = `<strong>${escapeHtml(state.me.nickname)}</strong><br><span class="muted">${tr(state.me.isAdmin ? 'roleAdmin' : 'roleFan')}</span>`;
 }
 
 function showAuth() {
@@ -83,7 +211,7 @@ function showAuth() {
 async function showApp() {
   $('#authView').classList.add('hidden');
   $('#appView').classList.remove('hidden');
-  $('#meCard').innerHTML = `<strong>${escapeHtml(state.me.nickname)}</strong><br><span class="muted">${state.me.isAdmin ? '管理员' : '粉丝用户'}</span>`;
+  renderMeCard();
   $('#adminBtn').classList.toggle('hidden', !state.me.isAdmin);
   renderHomeGreeting();
   connectSocket();
@@ -178,34 +306,34 @@ async function setupPush(requestPermission) {
   const button = $('#enableNotifications');
   button.classList.remove('hidden');
   if (!window.isSecureContext) {
-    button.textContent = '需要 HTTPS'; button.disabled = true;
-    setNotificationStatus('新消息通知只能在 HTTPS 网站上开启。', 'error'); return;
+    button.textContent = tr('requiresHttps'); button.disabled = true;
+    setNotificationStatus(tr('httpsOnly'), 'error'); return;
   }
   if (isIosDevice() && !isStandaloneApp()) {
-    button.textContent = '请先添加到主屏幕'; button.disabled = true;
-    setNotificationStatus('iPhone/iPad：请用 Safari 的“分享 → 添加到主屏幕”，再从主屏幕打开本站并开启通知。', 'error'); return;
+    button.textContent = tr('addHomeScreen'); button.disabled = true;
+    setNotificationStatus(tr('iosPushHint'), 'error'); return;
   }
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-    button.textContent = '此浏览器不支持通知'; button.disabled = true;
-    setNotificationStatus('当前浏览器不支持 Web Push，请使用最新版 Chrome、Edge 或 Safari。', 'error'); return;
+    button.textContent = tr('notificationsUnsupported'); button.disabled = true;
+    setNotificationStatus(tr('notificationsUnsupportedHint'), 'error'); return;
   }
 
   button.disabled = true;
-  button.textContent = '正在开启…';
-  setNotificationStatus(requestPermission ? '正在请求通知权限…' : '正在检查通知状态…');
+  button.textContent = tr('enabling');
+  setNotificationStatus(tr(requestPermission ? 'requestingPermission' : 'checkingNotifications'));
   try {
     // Permission must be requested before any await so mobile browsers retain the click gesture.
     let permission = Notification.permission;
     if (requestPermission && permission === 'default') permission = await Notification.requestPermission();
     if (permission !== 'granted') {
       const denied = permission === 'denied';
-      button.textContent = denied ? '通知已被浏览器禁止' : '🔔 开启新消息通知';
+      button.textContent = denied ? tr('notificationsBlocked') : `🔔 ${tr('enableNotifications')}`;
       button.disabled = denied;
-      setNotificationStatus(denied ? '通知权限已被禁止，请在浏览器的网站设置中改为“允许”。' : '尚未允许通知，请点击按钮开启。', denied ? 'error' : '');
+      setNotificationStatus(tr(denied ? 'notificationsBlockedHint' : 'notificationsNotAllowed'), denied ? 'error' : '');
       return;
     }
 
-    setNotificationStatus('正在注册后台通知服务…');
+    setNotificationStatus(tr('registeringPush'));
     const registration = await navigator.serviceWorker.register('/sw.js', { updateViaCache:'none' });
     await registration.update().catch(() => {});
     await navigator.serviceWorker.ready;
@@ -222,18 +350,18 @@ async function setupPush(requestPermission) {
     });
     await api('/api/push/subscribe', { method:'POST', body:JSON.stringify({ subscription:subscription.toJSON() }) });
     state.pushEndpoint = subscription.endpoint;
-    button.textContent = '✓ 新消息通知已开启'; button.disabled = true;
+    button.textContent = `✓ ${tr('notificationsEnabled')}`; button.disabled = true;
     button.classList.add('hidden');
-    setNotificationStatus('新消息通知已开启。', 'success');
+    setNotificationStatus(tr('notificationsEnabled'), 'success');
     updatePresence();
     if (requestPermission) {
-      setNotificationStatus('订阅成功，正在发送一条测试通知…');
+      setNotificationStatus(tr('testingPush'));
       await api('/api/push/test', { method:'POST' });
-      setNotificationStatus('通知已开启，测试通知已发送。', 'success');
+      setNotificationStatus(tr('testSent'), 'success');
     }
   } catch (err) {
-    const message = err.message || '开启通知失败';
-    button.textContent = '🔔 重试开启通知'; button.disabled = false;
+    const message = err.message || tr('notificationFailed');
+    button.textContent = `🔔 ${tr('retryNotifications')}`; button.disabled = false;
     setNotificationStatus(message, 'error');
     if (requestPermission) toast(message);
   }
@@ -282,6 +410,34 @@ function connectSocket() {
   state.socket.on('group:pinned', ({ groupId }) => {
     if (state.activeGroup?.id === groupId) loadGroupMessages(groupId);
   });
+  state.socket.on('group:created', () => {
+    if (state.currentPage === 'groups') loadGroups();
+    if (state.currentPage === 'admin') loadAdminGroups();
+  });
+  state.socket.on('group:updated', ({ group }) => {
+    state.groups = state.groups.map(item => item.id === group.id ? { ...item, ...group } : item);
+    if (state.activeGroup?.id === group.id) {
+      state.activeGroup = { ...state.activeGroup, ...group };
+      $('#groupHeader').textContent = group.name;
+    }
+    if (state.currentPage === 'groups' && !state.activeGroup) loadGroups();
+    if (state.currentPage === 'admin') loadAdminGroups();
+  });
+  state.socket.on('group:deleted', ({ groupId }) => {
+    state.groups = state.groups.filter(group => group.id !== groupId);
+    delete state.groupUnread[groupId];
+    renderUnread();
+    if (state.activeGroup?.id === groupId) {
+      closeGroupChat(false);
+      toast(tr('groupRemoved'));
+    }
+    if (state.manageGroup?.id === groupId) {
+      state.manageGroup = null;
+      $('#groupManagePanel').classList.add('hidden');
+    }
+    if (state.currentPage === 'groups') loadGroups();
+    if (state.currentPage === 'admin') loadAdminGroups();
+  });
   state.socket.on('message:updated', ({ scope, groupId }) => {
     if (scope === 'direct' && state.currentPage === 'direct' && state.directContact) loadDirectMessages();
     if (scope === 'group' && state.currentPage === 'groups' && state.activeGroup?.id === groupId) loadGroupMessages(groupId);
@@ -308,16 +464,18 @@ function connectSocket() {
 }
 
 function goPage(name) {
-  const titles = { home:'我的主页', direct:'一对一咨询', groups:'粉丝交流群', admin:'管理后台' };
   $$('.page').forEach(x => x.classList.add('hidden'));
   $(`#${name}Page`).classList.remove('hidden');
   $$('.nav-btn').forEach(x => x.classList.toggle('active', x.dataset.page === name));
-  $('#pageTitle').textContent = titles[name];
+  $('#pageTitle').textContent = tr(name);
   state.currentPage = name;
   if (name === 'home') renderHomeGreeting();
-  $('.sidebar').classList.remove('open');
+  setSidebarOpen(false);
   if (name === 'direct') loadDirectContacts();
-  if (name === 'groups') loadGroups();
+  if (name === 'groups') {
+    closeGroupChat(false);
+    loadGroups();
+  }
   if (name === 'admin' && state.me.isAdmin) loadAdminGroups();
   updatePresence();
 }
@@ -360,14 +518,46 @@ $('#logoutBtn').onclick = async () => {
 
 $$('.nav-btn').forEach(btn => btn.onclick = () => goPage(btn.dataset.page));
 $$('[data-goto]').forEach(btn => btn.onclick = () => goPage(btn.dataset.goto));
-$('#mobileMenu').onclick = () => $('.sidebar').classList.toggle('open');
+function setSidebarOpen(open) {
+  $('.sidebar').classList.toggle('open', open);
+  $('#sidebarBackdrop').classList.toggle('hidden', !open);
+  $('#mobileMenu').setAttribute('aria-expanded', String(open));
+  document.body.classList.toggle('menu-open', open);
+}
+$('#mobileMenu').onclick = () => setSidebarOpen(!$('.sidebar').classList.contains('open'));
+$('#sidebarBackdrop').onclick = () => setSidebarOpen(false);
 $('#enableNotifications').onclick = () => setupPush(true);
+$('#languageButton').onclick = (event) => {
+  event.stopPropagation();
+  const menu = $('#languageMenu');
+  const open = menu.classList.toggle('hidden') === false;
+  $('#languageButton').setAttribute('aria-expanded', String(open));
+};
+$$('[data-language]').forEach(button => button.onclick = () => {
+  applyLanguage(button.dataset.language);
+  $('#languageMenu').classList.add('hidden');
+  $('#languageButton').setAttribute('aria-expanded', 'false');
+});
+$('#themeToggle').onclick = () => applyTheme(state.theme === 'dark' ? 'light' : 'dark');
 navigator.serviceWorker?.addEventListener('message', (event) => {
   if (event.data?.type === 'push-subscription-changed') setupPush(false);
 });
 document.addEventListener('visibilitychange', updatePresence);
 window.addEventListener('focus', updatePresence);
 window.addEventListener('blur', updatePresence);
+window.addEventListener('resize', () => { if (window.innerWidth > 820) setSidebarOpen(false); });
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.language-switcher')) {
+    $('#languageMenu').classList.add('hidden');
+    $('#languageButton').setAttribute('aria-expanded', 'false');
+  }
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  setSidebarOpen(false);
+  $('#languageMenu').classList.add('hidden');
+  if (state.activeGroup) closeGroupChat(false);
+});
 
 // Direct chat
 async function loadDirectContacts() {
@@ -384,7 +574,7 @@ async function loadDirectContacts() {
     renderUnread();
     const box = $('#directContacts');
     if (!contacts.length) {
-      box.innerHTML = '<div class="contact-item muted">暂无可用联系人</div>';
+      box.innerHTML = `<div class="contact-item muted">${tr('noContacts')}</div>`;
       return;
     }
     box.innerHTML = contacts.map(c => `
@@ -422,7 +612,7 @@ async function loadDirectMessages() {
   try {
     const query = state.me.isAdmin ? `?userId=${state.directContact.id}` : '';
     const { messages } = await api('/api/direct/messages' + query);
-    $('#directHeader').textContent = `与 ${state.directContact.nickname} 的对话`;
+    $('#directHeader').textContent = tr('conversationWith', { name:state.directContact.nickname });
     $('#directForm').classList.remove('hidden');
     $('#directMessages').innerHTML = messages.map(m => messageHtml(m, m.from_user_id === state.me.id, false)).join('');
     bindMessageInteractions($('#directMessages'), 'direct');
@@ -448,19 +638,19 @@ async function loadGroups() {
     const box = $('#groupList');
     box.innerHTML = groups.length ? groups.map(g => {
       let action = '';
-      if (state.me.isAdmin || g.my_status === 'approved') action = `<button class="primary" data-open-group="${g.id}">进入群聊</button>`;
-      else if (g.my_status === 'pending') action = `<button class="small-btn" disabled>等待审核</button>`;
-      else action = `<button class="secondary" data-join-group="${g.id}">申请加入</button>`;
+      if (state.me.isAdmin || g.my_status === 'approved') action = `<button class="primary" data-open-group="${g.id}">${tr('enterGroup')}</button>`;
+      else if (g.my_status === 'pending') action = `<button class="small-btn" disabled>${tr('waitingReview')}</button>`;
+      else action = `<button class="secondary" data-join-group="${g.id}">${tr('requestJoin')}</button>`;
       return `<article class="group-card">
         <h3><span>${escapeHtml(g.name)}</span>${state.groupUnread[g.id] ? `<span class="unread-badge">${state.groupUnread[g.id]}</span>` : ''}</h3>
-        <p>${escapeHtml(g.description || '暂无简介')}</p>
-        <div class="badge">${g.member_count} 位成员</div><br>
+        <p>${escapeHtml(g.description || tr('noDescription'))}</p>
+        <div class="badge">${tr('memberCount', { count:g.member_count })}</div><br>
         ${action}
       </article>`;
-    }).join('') : '<div class="panel muted">目前还没有群聊。</div>';
+    }).join('') : `<div class="panel muted">${tr('noGroups')}</div>`;
 
     $$('[data-join-group]').forEach(btn => btn.onclick = async () => {
-      try { await api(`/api/groups/${btn.dataset.joinGroup}/join`, { method:'POST' }); toast('入群申请已提交'); loadGroups(); }
+      try { await api(`/api/groups/${btn.dataset.joinGroup}/join`, { method:'POST' }); toast(tr('joinSubmitted')); loadGroups(); }
       catch (err) { toast(err.message); }
     });
     $$('[data-open-group]').forEach(btn => btn.onclick = () => openGroup(Number(btn.dataset.openGroup)));
@@ -473,21 +663,35 @@ async function loadGroups() {
 
 async function openGroup(groupId) {
   state.activeGroup = state.groups.find(g => g.id === groupId) || { id: groupId, name:'群聊' };
+  $('#groupList').classList.add('hidden');
   $('#groupChat').classList.remove('hidden');
   $('#groupHeader').textContent = state.activeGroup.name;
   clearGroupUnread(groupId);
   state.socket?.emit('group:join', groupId);
   await loadGroupMessages(groupId);
   updatePresence();
-  $('#groupChat').scrollIntoView({ behavior:'smooth', block:'start' });
+  window.scrollTo({ top:0, behavior:'smooth' });
 }
+
+function closeGroupChat(reload = true) {
+  state.activeGroup = null;
+  $('#groupChat').classList.add('hidden');
+  $('#groupList').classList.remove('hidden');
+  $('#groupHeader').textContent = '';
+  $('#groupMessages').innerHTML = '';
+  $('#pinnedMessage').classList.add('hidden');
+  updatePresence();
+  if (reload && state.currentPage === 'groups') loadGroups();
+}
+
+$('#closeGroupChat').onclick = () => closeGroupChat();
 
 async function loadGroupMessages(groupId) {
   try {
     const { messages } = await api(`/api/groups/${groupId}/messages`);
     const pinned = messages.find(m => m.is_pinned);
     $('#pinnedMessage').classList.toggle('hidden', !pinned);
-    $('#pinnedMessage').innerHTML = pinned ? `📌 <strong>置顶：</strong>${escapeHtml(messageSummary(pinned))}` : '';
+    $('#pinnedMessage').innerHTML = pinned ? `📌 <strong>${tr('pinnedLabel')}：</strong>${escapeHtml(messageSummary(pinned))}` : '';
     $('#groupMessages').innerHTML = messages.map(m => messageHtml(m, m.user_id === state.me.id, true)).join('');
     bindMessageInteractions($('#groupMessages'), 'group');
     $$('[data-pin-message]').forEach(btn => btn.onclick = async () => {
@@ -499,8 +703,8 @@ async function loadGroupMessages(groupId) {
 }
 
 function messageSummary(message) {
-  if (message.is_recalled) return '消息已撤回';
-  return ({ image:'[图片]', video:'[视频]', audio:'[语音]', location:'[位置]' }[message.message_type]) || message.content || '';
+  if (message.is_recalled) return tr('recalled');
+  return ({ image:tr('image'), video:tr('video'), audio:tr('audio'), location:tr('location') }[message.message_type]) || message.content || '';
 }
 
 function messageContentHtml(message) {
@@ -539,7 +743,7 @@ function messageHtml(message, mine, isGroup) {
       <div class="bubble" data-message-bubble>
         <div class="message-meta">${escapeHtml(sender || '')} · ${fmtTime(message.created_at)}</div>
         ${messageContentHtml(message)}
-        ${isGroup && state.me.isAdmin && !message.is_recalled ? `<div class="message-tools"><button type="button" class="small-btn" data-pin-message="${message.id}">📌 置顶</button></div>` : ''}
+        ${isGroup && state.me.isAdmin && !message.is_recalled ? `<div class="message-tools"><button type="button" class="small-btn" data-pin-message="${message.id}">${message.is_pinned ? `📍 ${tr('unpin')}` : `📌 ${tr('pinned')}`}</button></div>` : ''}
       </div>
     </div>
   </div>`;
@@ -834,7 +1038,7 @@ function resetRecordingUi() {
   state.recordingStream?.getTracks().forEach(track => track.stop());
   $$('[data-rich-action="audio"]').forEach(button => {
     button.classList.remove('recording');
-    button.textContent = '🎤 语音';
+    button.textContent = `🎤 ${tr('voice')}`;
   });
   state.recorder = null;
   state.recordingStream = null;
@@ -861,7 +1065,7 @@ async function startVoiceRecording(scope) {
   state.recordingScope = scope;
   const button = document.querySelector(`[data-rich-action="audio"][data-scope="${scope}"]`);
   button.classList.add('recording');
-  button.textContent = '⏹️ 停止录音';
+  button.textContent = `⏹️ ${tr('stopRecording')}`;
   recorder.ondataavailable = event => { if (event.data.size) state.recordingChunks.push(event.data); };
   recorder.onstop = async () => {
     const chunks = state.recordingChunks;
@@ -923,25 +1127,30 @@ $('#createGroupForm').onsubmit = async (e) => {
   const body = Object.fromEntries(new FormData(e.target));
   try {
     await api('/api/groups', { method:'POST', body:JSON.stringify(body) });
-    e.target.reset(); toast('群聊已创建'); loadAdminGroups();
+    e.target.reset(); toast(tr('groupCreated')); loadAdminGroups();
   } catch (err) { toast(err.message); }
 };
 
 async function loadAdminGroups() {
-  const { groups } = await api('/api/groups');
-  state.groups = groups;
-  $('#adminGroupList').innerHTML = groups.length ? groups.map(g => `
-    <div class="admin-group-row">
-      <div><strong>${escapeHtml(g.name)}</strong><div class="muted">${g.member_count} 位成员</div></div>
-      <button class="small-btn" data-manage-group="${g.id}">管理</button>
-    </div>`).join('') : '<div class="muted">暂无群聊</div>';
-  $$('[data-manage-group]').forEach(btn => btn.onclick = () => loadGroupManage(Number(btn.dataset.manageGroup)));
+  try {
+    const { groups } = await api('/api/groups');
+    state.groups = groups;
+    $('#adminGroupList').innerHTML = groups.length ? groups.map(g => `
+      <div class="admin-group-row">
+        <div><strong>${escapeHtml(g.name)}</strong><div class="muted">${tr('memberCount', { count:g.member_count })}</div></div>
+        <button class="small-btn" data-manage-group="${g.id}">${tr('manage')}</button>
+      </div>`).join('') : `<div class="muted">${tr('noAdminGroups')}</div>`;
+    $$('[data-manage-group]').forEach(btn => btn.onclick = () => loadGroupManage(Number(btn.dataset.manageGroup)));
+  } catch (err) { toast(err.message); }
 }
 
 async function loadGroupManage(groupId) {
   state.manageGroup = state.groups.find(g => g.id === groupId);
+  if (!state.manageGroup) return;
   $('#groupManagePanel').classList.remove('hidden');
-  $('#manageGroupTitle').textContent = `管理：${state.manageGroup?.name || '群聊'}`;
+  $('#manageGroupTitle').textContent = tr('manageNamed', { name:state.manageGroup.name });
+  $('#editGroupName').value = state.manageGroup.name || '';
+  $('#editGroupDescription').value = state.manageGroup.description || '';
   try {
     const [r1, r2] = await Promise.all([
       api(`/api/groups/${groupId}/requests`),
@@ -951,19 +1160,19 @@ async function loadGroupManage(groupId) {
       <div class="request-row">
         <div><strong>${escapeHtml(u.nickname)}</strong><div class="muted">${escapeHtml(u.email)}</div></div>
         <div class="row-actions">
-          <button class="small-btn" data-approve="${u.id}">通过</button>
-          <button class="danger" data-reject="${u.id}">拒绝</button>
+          <button class="small-btn" data-approve="${u.id}">${tr('approve')}</button>
+          <button class="danger" data-reject="${u.id}">${tr('reject')}</button>
         </div>
-      </div>`).join('') : '<div class="muted">暂无待审核申请</div>';
+      </div>`).join('') : `<div class="muted">${tr('noRequests')}</div>`;
 
     $('#groupMembers').innerHTML = r2.members.map(u => `
       <div class="member-row">
         <div><strong>${escapeHtml(u.nickname)} ${u.is_admin ? '🛡️' : ''}</strong>
-          <div class="muted">${u.mute_until ? `禁言至 ${fmtTime(u.mute_until)}` : '正常'}</div></div>
+          <div class="muted">${u.mute_until ? tr('mutedUntil', { time:fmtTime(u.mute_until) }) : tr('normal')}</div></div>
         ${u.is_admin ? '' : `<div class="row-actions">
-          <button class="small-btn" data-mute="${u.id}" data-minutes="60">禁言1小时</button>
-          <button class="small-btn" data-mute="${u.id}" data-minutes="0">解除禁言</button>
-          <button class="danger" data-kick="${u.id}">踢出</button>
+          <button class="small-btn" data-mute="${u.id}" data-minutes="60">${tr('muteHour')}</button>
+          <button class="small-btn" data-mute="${u.id}" data-minutes="0">${tr('unmute')}</button>
+          <button class="danger" data-kick="${u.id}">${tr('remove')}</button>
         </div>`}
       </div>`).join('');
 
@@ -971,22 +1180,52 @@ async function loadGroupManage(groupId) {
     $$('[data-reject]').forEach(btn => btn.onclick = () => adminAction(`/api/groups/${groupId}/requests/${btn.dataset.reject}/reject`, 'POST', groupId));
     $$('[data-mute]').forEach(btn => btn.onclick = () => adminAction(`/api/groups/${groupId}/members/${btn.dataset.mute}/mute`, 'POST', groupId, { minutes:Number(btn.dataset.minutes) }));
     $$('[data-kick]').forEach(btn => btn.onclick = async () => {
-      if (!confirm('确定要把该用户踢出群聊吗？')) return;
+      if (!confirm(tr('confirmKick'))) return;
       await adminAction(`/api/groups/${groupId}/members/${btn.dataset.kick}`, 'DELETE', groupId);
     });
   } catch (err) { toast(err.message); }
 }
 
+$('#editGroupForm').onsubmit = async (event) => {
+  event.preventDefault();
+  if (!state.manageGroup) return;
+  const body = Object.fromEntries(new FormData(event.target));
+  try {
+    const { group } = await api(`/api/groups/${state.manageGroup.id}`, {
+      method:'PATCH', body:JSON.stringify(body)
+    });
+    state.manageGroup = { ...state.manageGroup, ...group };
+    toast(tr('groupSaved'));
+    await loadAdminGroups();
+    await loadGroupManage(group.id);
+  } catch (err) { toast(err.message); }
+};
+
+$('#deleteGroupBtn').onclick = async () => {
+  if (!state.manageGroup) return;
+  const group = state.manageGroup;
+  if (!confirm(tr('confirmDissolve', { name:group.name }))) return;
+  try {
+    await api(`/api/groups/${group.id}`, { method:'DELETE' });
+    state.manageGroup = null;
+    $('#groupManagePanel').classList.add('hidden');
+    toast(tr('groupDissolved'));
+    await loadAdminGroups();
+  } catch (err) { toast(err.message); }
+};
+
 async function adminAction(url, method, groupId, body) {
   try {
     await api(url, { method, body: body ? JSON.stringify(body) : undefined });
-    toast('操作成功'); loadGroupManage(groupId); loadAdminGroups();
+    toast(tr('operationSuccess')); loadGroupManage(groupId); loadAdminGroups();
   } catch (err) { toast(err.message); }
 }
 
 function scrollBottom(el) { requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; }); }
 
 (async function init() {
+  applyLanguage(state.languagePreference, false);
+  applyTheme(state.theme);
   try {
     const { user } = await api('/api/me');
     state.me = user;

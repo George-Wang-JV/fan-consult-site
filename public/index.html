@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#111827" />
+  <meta id="themeColor" name="theme-color" content="#f5f7fb" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>粉丝咨询中心</title>
   <link rel="stylesheet" href="/styles.css" />
@@ -15,23 +15,23 @@
   <main id="authView" class="auth-shell">
     <section class="auth-card">
       <div class="brand">💬 区块透镜粉丝群</div>
-      <p class="muted">注册后可进行一对一咨询，并申请加入粉丝交流群。</p>
+      <p class="muted" data-i18n="authDescription">注册后可进行一对一咨询，并申请加入粉丝交流群。</p>
       <div class="tabs">
-        <button id="loginTab" class="tab active">登录</button>
-        <button id="registerTab" class="tab">注册</button>
+        <button id="loginTab" class="tab active" data-i18n="login">登录</button>
+        <button id="registerTab" class="tab" data-i18n="register">注册</button>
       </div>
 
       <form id="loginForm" class="form-stack">
-        <label>邮箱<input name="email" type="email" required /></label>
-        <label>密码<input name="password" type="password" required /></label>
-        <button class="primary" type="submit">登录</button>
+        <label><span data-i18n="email">邮箱</span><input name="email" type="email" required /></label>
+        <label><span data-i18n="password">密码</span><input name="password" type="password" required /></label>
+        <button class="primary" type="submit" data-i18n="login">登录</button>
       </form>
 
       <form id="registerForm" class="form-stack hidden">
-        <label>昵称<input name="nickname" maxlength="30" required /></label>
-        <label>邮箱<input name="email" type="email" required /></label>
-        <label>密码<input name="password" type="password" minlength="8" required /></label>
-        <button class="primary" type="submit">创建账号</button>
+        <label><span data-i18n="nickname">昵称</span><input name="nickname" maxlength="30" required /></label>
+        <label><span data-i18n="email">邮箱</span><input name="email" type="email" required /></label>
+        <label><span data-i18n="password">密码</span><input name="password" type="password" minlength="8" required /></label>
+        <button class="primary" type="submit" data-i18n="createAccount">创建账号</button>
       </form>
     </section>
   </main>
@@ -41,41 +41,53 @@
       <div class="brand small">💬 咨询中心</div>
       <div id="meCard" class="me-card"></div>
       <nav>
-        <button data-page="home" class="nav-btn active">🏠 我的主页</button>
-        <button data-page="direct" class="nav-btn">👤 一对一咨询 <span id="directUnread" class="unread-badge hidden"></span></button>
-        <button data-page="groups" class="nav-btn">👥 粉丝交流群 <span id="groupUnread" class="unread-badge hidden"></span></button>
-        <button id="adminBtn" data-page="admin" class="nav-btn hidden">🛡️ 管理后台</button>
+        <button data-page="home" class="nav-btn active">🏠 <span data-i18n="home">我的主页</span></button>
+        <button data-page="direct" class="nav-btn">👤 <span data-i18n="direct">一对一咨询</span> <span id="directUnread" class="unread-badge hidden"></span></button>
+        <button data-page="groups" class="nav-btn">👥 <span data-i18n="groups">粉丝交流群</span> <span id="groupUnread" class="unread-badge hidden"></span></button>
+        <button id="adminBtn" data-page="admin" class="nav-btn hidden">🛡️ <span data-i18n="admin">管理后台</span></button>
       </nav>
-      <button id="logoutBtn" class="ghost">退出登录</button>
+      <button id="logoutBtn" class="ghost" data-i18n="logout">退出登录</button>
     </aside>
+    <button id="sidebarBackdrop" class="sidebar-backdrop hidden" type="button" aria-label="关闭菜单"></button>
 
     <section class="content">
       <header class="topbar">
-        <button id="mobileMenu" class="ghost mobile-only">☰</button>
-        <h1 id="pageTitle">我的主页</h1>
+        <button id="mobileMenu" class="ghost mobile-only mobile-menu-button" type="button" aria-label="打开菜单" aria-expanded="false">☰</button>
+        <h1 id="pageTitle" data-i18n="home">我的主页</h1>
+        <div class="topbar-actions">
+          <div class="language-switcher">
+            <button id="languageButton" class="topbar-icon-button" type="button" aria-label="切换语言" aria-expanded="false" title="切换语言">🌐</button>
+            <div id="languageMenu" class="language-menu hidden" role="menu">
+              <button type="button" data-language="auto">🌐 <span data-i18n="followSystem">跟随系统</span></button>
+              <button type="button" data-language="zh-CN">中文</button>
+              <button type="button" data-language="en">English</button>
+            </div>
+          </div>
+          <button id="themeToggle" class="topbar-icon-button" type="button" aria-label="切换深色模式" title="切换深色模式">🌙</button>
+        </div>
       </header>
 
       <div id="homePage" class="page">
         <div class="hero-card home-card">
           <p id="homeGreeting" class="home-greeting"></p>
-          <p>没有审核，畅所欲言</p>
+          <p data-i18n="homeDescription">没有审核，畅所欲言</p>
           <div class="hero-actions">
-            <button class="primary" data-goto="direct">开始咨询</button>
-            <button class="secondary" data-goto="groups">查看群聊</button>
-            <button id="enableNotifications" class="secondary">🔔 开启新消息通知</button>
+            <button class="primary" data-goto="direct" data-i18n="startConsultation">开始咨询</button>
+            <button class="secondary" data-goto="groups" data-i18n="viewGroups">查看群聊</button>
+            <button id="enableNotifications" class="secondary">🔔 <span data-i18n="enableNotifications">开启新消息通知</span></button>
           </div>
-          <p id="notificationStatus" class="notification-status muted" aria-live="polite">点击开启后，浏览器会请求通知权限。</p>
+          <p id="notificationStatus" class="notification-status muted" aria-live="polite" data-i18n="notificationHint">点击开启后，浏览器会请求通知权限。</p>
         </div>
 
         <div class="hero-card home-card referral-card">
-          <h2>使用我的邀请码注册享受返佣！</h2>
+          <h2 data-i18n="referralTitle">使用我的邀请码注册享受返佣！</h2>
           <div class="hero-actions">
             <a
               class="primary referral-button"
               href="https://partner.bitget.cafe/bg/Bitfk"
               target="_blank"
               rel="noopener noreferrer sponsored"
-            >点我注册</a>
+            ><span data-i18n="registerNow">点我注册</span></a>
           </div>
         </div>
       </div>
@@ -84,18 +96,18 @@
         <div class="chat-layout">
           <aside id="directContacts" class="contact-list"></aside>
           <section class="chat-panel">
-            <div id="directHeader" class="chat-header">请选择联系人</div>
+            <div id="directHeader" class="chat-header" data-i18n="selectContact">请选择联系人</div>
             <div id="directMessages" class="messages"></div>
             <form id="directForm" class="composer hidden">
               <div class="composer-tools" aria-label="更多发送方式">
-                <button type="button" class="composer-tool" data-rich-action="image" data-scope="direct">📷 照片</button>
-                <button type="button" class="composer-tool" data-rich-action="video" data-scope="direct">🎬 视频</button>
-                <button type="button" class="composer-tool" data-rich-action="audio" data-scope="direct">🎤 语音</button>
-                <button type="button" class="composer-tool" data-rich-action="location" data-scope="direct">📍 位置</button>
+                <button type="button" class="composer-tool" data-rich-action="image" data-scope="direct">📷 <span data-i18n="photo">照片</span></button>
+                <button type="button" class="composer-tool" data-rich-action="video" data-scope="direct">🎬 <span data-i18n="videoLabel">视频</span></button>
+                <button type="button" class="composer-tool" data-rich-action="audio" data-scope="direct">🎤 <span data-i18n="voice">语音</span></button>
+                <button type="button" class="composer-tool" data-rich-action="location" data-scope="direct">📍 <span data-i18n="locationLabel">位置</span></button>
               </div>
               <div class="composer-main">
-                <input id="directInput" maxlength="2000" placeholder="输入消息…" autocomplete="off" />
-                <button class="primary" type="submit">发送</button>
+                <input id="directInput" maxlength="2000" placeholder="输入消息…" data-i18n-placeholder="messagePlaceholder" autocomplete="off" />
+                <button class="primary" type="submit" data-i18n="send">发送</button>
               </div>
             </form>
           </section>
@@ -105,19 +117,22 @@
       <div id="groupsPage" class="page hidden">
         <div id="groupList" class="card-grid"></div>
         <section id="groupChat" class="chat-panel standalone hidden">
-          <div id="groupHeader" class="chat-header"></div>
+          <div class="chat-header group-chat-header">
+            <span id="groupHeader"></span>
+            <button id="closeGroupChat" class="group-chat-close" type="button" aria-label="退出群聊对话框" title="退出群聊对话框">✕</button>
+          </div>
           <div id="pinnedMessage" class="pinned hidden"></div>
           <div id="groupMessages" class="messages"></div>
           <form id="groupForm" class="composer">
             <div class="composer-tools" aria-label="更多发送方式">
-              <button type="button" class="composer-tool" data-rich-action="image" data-scope="group">📷 照片</button>
-              <button type="button" class="composer-tool" data-rich-action="video" data-scope="group">🎬 视频</button>
-              <button type="button" class="composer-tool" data-rich-action="audio" data-scope="group">🎤 语音</button>
-              <button type="button" class="composer-tool" data-rich-action="location" data-scope="group">📍 位置</button>
+              <button type="button" class="composer-tool" data-rich-action="image" data-scope="group">📷 <span data-i18n="photo">照片</span></button>
+              <button type="button" class="composer-tool" data-rich-action="video" data-scope="group">🎬 <span data-i18n="videoLabel">视频</span></button>
+              <button type="button" class="composer-tool" data-rich-action="audio" data-scope="group">🎤 <span data-i18n="voice">语音</span></button>
+              <button type="button" class="composer-tool" data-rich-action="location" data-scope="group">📍 <span data-i18n="locationLabel">位置</span></button>
             </div>
             <div class="composer-main">
-              <input id="groupInput" maxlength="2000" placeholder="发送群消息…" autocomplete="off" />
-              <button class="primary" type="submit">发送</button>
+              <input id="groupInput" maxlength="2000" placeholder="发送群消息…" data-i18n-placeholder="groupMessagePlaceholder" autocomplete="off" />
+              <button class="primary" type="submit" data-i18n="send">发送</button>
             </div>
           </form>
         </section>
@@ -126,23 +141,31 @@
       <div id="adminPage" class="page hidden">
         <div class="admin-grid">
           <section class="panel">
-            <h3>创建粉丝群</h3>
+            <h3 data-i18n="createGroup">创建粉丝群</h3>
             <form id="createGroupForm" class="form-stack compact">
-              <label>群名称<input name="name" maxlength="40" required /></label>
-              <label>简介<textarea name="description" maxlength="200"></textarea></label>
-              <button class="primary" type="submit">创建群聊</button>
+              <label><span data-i18n="groupName">群名称</span><input name="name" maxlength="40" required /></label>
+              <label><span data-i18n="description">简介</span><textarea name="description" maxlength="200"></textarea></label>
+              <button class="primary" type="submit" data-i18n="createGroupChat">创建群聊</button>
             </form>
           </section>
           <section class="panel">
-            <h3>群管理</h3>
+            <h3 data-i18n="groupManagement">群管理</h3>
             <div id="adminGroupList"></div>
           </section>
         </div>
         <section id="groupManagePanel" class="panel hidden">
-          <h3 id="manageGroupTitle">群管理</h3>
+          <h3 id="manageGroupTitle" data-i18n="groupManagement">群管理</h3>
+          <form id="editGroupForm" class="form-stack compact group-settings-form">
+            <label><span data-i18n="groupName">群名称</span><input id="editGroupName" name="name" maxlength="40" required /></label>
+            <label><span data-i18n="description">简介</span><textarea id="editGroupDescription" name="description" maxlength="200"></textarea></label>
+            <div class="row-actions group-settings-actions">
+              <button class="primary" type="submit" data-i18n="saveChanges">保存修改</button>
+              <button id="deleteGroupBtn" class="danger" type="button" data-i18n="dissolveGroup">解散群聊</button>
+            </div>
+          </form>
           <div class="manage-columns">
-            <div><h4>待审核申请</h4><div id="joinRequests"></div></div>
-            <div><h4>群成员</h4><div id="groupMembers"></div></div>
+            <div><h4 data-i18n="pendingRequests">待审核申请</h4><div id="joinRequests"></div></div>
+            <div><h4 data-i18n="groupMembers">群成员</h4><div id="groupMembers"></div></div>
           </div>
         </section>
       </div>
@@ -152,7 +175,7 @@
   <input id="mediaPicker" class="hidden" type="file" />
   <div id="messageActions" class="action-backdrop hidden" role="presentation">
     <section class="action-sheet" role="dialog" aria-modal="true" aria-label="消息操作">
-      <div class="action-title">回应这条消息</div>
+      <div class="action-title" data-i18n="replyMessage">回应这条消息</div>
       <div class="reaction-picker">
         <button type="button" data-reaction="👍">👍</button>
         <button type="button" data-reaction="❤️">❤️</button>
@@ -161,9 +184,9 @@
         <button type="button" data-reaction="😢">😢</button>
         <button type="button" data-reaction="🙏">🙏</button>
       </div>
-      <button id="recallMessage" type="button" class="action-row">↩️ 撤回（所有人不可见）</button>
-      <button id="deleteMessage" type="button" class="action-row danger-text">🗑️ 删除（仅自己不可见）</button>
-      <button id="closeMessageActions" type="button" class="action-row cancel-row">取消</button>
+      <button id="recallMessage" type="button" class="action-row">↩️ <span data-i18n="recallAll">撤回（所有人不可见）</span></button>
+      <button id="deleteMessage" type="button" class="action-row danger-text">🗑️ <span data-i18n="deleteSelf">删除（仅自己不可见）</span></button>
+      <button id="closeMessageActions" type="button" class="action-row cancel-row" data-i18n="cancel">取消</button>
     </section>
   </div>
 
@@ -172,8 +195,8 @@
       <button id="imageZoomOut" type="button" aria-label="缩小图片">−</button>
       <span id="imageZoomLabel">100%</span>
       <button id="imageZoomIn" type="button" aria-label="放大图片">＋</button>
-      <button id="imageZoomReset" type="button">适应屏幕</button>
-      <button id="imageDownload" type="button">⬇ 下载</button>
+      <button id="imageZoomReset" type="button" data-i18n="fitScreen">适应屏幕</button>
+      <button id="imageDownload" type="button">⬇ <span data-i18n="download">下载</span></button>
       <button id="imageViewerClose" type="button" aria-label="关闭图片预览">✕</button>
     </div>
     <div id="imageViewerStage" class="image-viewer-stage">
