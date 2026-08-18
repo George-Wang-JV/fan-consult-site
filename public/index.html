@@ -57,8 +57,8 @@
 
       <div id="homePage" class="page">
         <div class="hero-card home-card">
-          <h2>欢迎来到废慨vc咨询中心</h2>
-          <p>没有审核，可以畅所欲言。</p>
+          <p id="homeGreeting" class="home-greeting"></p>
+          <p>私人群，说啥都行，没有审核。</p>
           <div class="hero-actions">
             <button class="primary" data-goto="direct">开始咨询</button>
             <button class="secondary" data-goto="groups">查看群聊</button>
@@ -165,6 +165,20 @@
       <button id="deleteMessage" type="button" class="action-row danger-text">🗑️ 删除（仅自己不可见）</button>
       <button id="closeMessageActions" type="button" class="action-row cancel-row">取消</button>
     </section>
+  </div>
+
+  <div id="imageViewer" class="image-viewer hidden" role="dialog" aria-modal="true" aria-label="图片预览" aria-hidden="true">
+    <div class="image-viewer-toolbar">
+      <button id="imageZoomOut" type="button" aria-label="缩小图片">−</button>
+      <span id="imageZoomLabel">100%</span>
+      <button id="imageZoomIn" type="button" aria-label="放大图片">＋</button>
+      <button id="imageZoomReset" type="button">适应屏幕</button>
+      <button id="imageDownload" type="button">⬇ 下载</button>
+      <button id="imageViewerClose" type="button" aria-label="关闭图片预览">✕</button>
+    </div>
+    <div id="imageViewerStage" class="image-viewer-stage">
+      <img id="imageViewerImage" alt="聊天图片预览" />
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

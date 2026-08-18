@@ -19,7 +19,12 @@ const state = {
   recordingStream: null,
   recordingChunks: [],
   recordingScope: null,
-  recordingTimer: null
+  recordingTimer: null,
+  imageViewerUrl: null,
+  imageViewerName: null,
+  imageViewerScale: 1,
+  imageViewerBaseWidth: 0,
+  imageViewerBaseHeight: 0
 };
 
 function toast(message) {
@@ -52,6 +57,24 @@ function escapeHtml(value) {
   }[c]));
 }
 
+function beijingGreeting() {
+  const hour = Number(new Intl.DateTimeFormat('en-US', {
+    timeZone:'Asia/Shanghai', hour:'2-digit', hourCycle:'h23'
+  }).format(new Date()));
+  if (hour >= 5 && hour < 9) return '早上';
+  if (hour >= 9 && hour < 12) return '上午';
+  if (hour >= 12 && hour < 18) return '下午';
+  return '晚上';
+}
+
+function renderHomeGreeting() {
+  if (!state.me) return;
+  const nickname = `<strong>${escapeHtml(state.me.nickname)}</strong>`;
+  const adminTitle = state.me.isAdmin ? ' 管理员' : '';
+  const destination = state.me.isAdmin ? '废慨vc咨询中心后台' : '废慨vc咨询中心';
+  $('#homeGreeting').innerHTML = `尊敬的 ${nickname}${adminTitle}，北京时间${beijingGreeting()}好，欢迎来到${destination}。`;
+}
+
 function showAuth() {
   $('#authView').classList.remove('hidden');
   $('#appView').classList.add('hidden');
@@ -62,6 +85,7 @@ async function showApp() {
   $('#appView').classList.remove('hidden');
   $('#meCard').innerHTML = `<strong>${escapeHtml(state.me.nickname)}</strong><br><span class="muted">${state.me.isAdmin ? '管理员' : '粉丝用户'}</span>`;
   $('#adminBtn').classList.toggle('hidden', !state.me.isAdmin);
+  renderHomeGreeting();
   connectSocket();
   await Promise.all([setupPush(false), loadDirectUnread()]);
   await openInitialRoute();
@@ -152,6 +176,7 @@ function subscriptionUsesKey(subscription, publicKey) {
 
 async function setupPush(requestPermission) {
   const button = $('#enableNotifications');
+  button.classList.remove('hidden');
   if (!window.isSecureContext) {
     button.textContent = '需要 HTTPS'; button.disabled = true;
     setNotificationStatus('新消息通知只能在 HTTPS 网站上开启。', 'error'); return;
@@ -198,6 +223,7 @@ async function setupPush(requestPermission) {
     await api('/api/push/subscribe', { method:'POST', body:JSON.stringify({ subscription:subscription.toJSON() }) });
     state.pushEndpoint = subscription.endpoint;
     button.textContent = '✓ 新消息通知已开启'; button.disabled = true;
+    button.classList.add('hidden');
     setNotificationStatus('新消息通知已开启。', 'success');
     updatePresence();
     if (requestPermission) {
@@ -288,6 +314,7 @@ function goPage(name) {
   $$('.nav-btn').forEach(x => x.classList.toggle('active', x.dataset.page === name));
   $('#pageTitle').textContent = titles[name];
   state.currentPage = name;
+  if (name === 'home') renderHomeGreeting();
   $('.sidebar').classList.remove('open');
   if (name === 'direct') loadDirectContacts();
   if (name === 'groups') loadGroups();
@@ -481,7 +508,8 @@ function messageContentHtml(message) {
   const url = escapeHtml(message.media_url || '');
   const mimeType = escapeHtml(message.metadata?.mimeType || '');
   if (message.message_type === 'image') {
-    return `<img class="message-media" src="${url}" alt="聊天图片" loading="lazy" />`;
+    const imageName = escapeHtml(message.metadata?.originalName || '聊天图片');
+    return `<img class="message-media message-image" src="${url}" alt="聊天图片" loading="lazy" data-preview-image data-image-name="${imageName}" />`;
   }
   if (message.message_type === 'video') {
     return `<video class="message-media" controls playsinline preload="metadata"><source src="${url}" type="${mimeType}" />你的浏览器无法播放此视频。</video>`;
@@ -587,8 +615,107 @@ function bindMessageInteractions(container, scope) {
         catch (err) { toast(err.message); }
       };
     });
+    row.querySelectorAll('[data-preview-image]').forEach(image => {
+      image.addEventListener('click', (event) => {
+        event.stopPropagation();
+        openImageViewer(image.currentSrc || image.src, image.dataset.imageName || '聊天图片');
+      });
+      image.addEventListener('dragstart', (event) => event.preventDefault());
+    });
   });
 }
+
+function updateImageViewerSize() {
+  const image = $('#imageViewerImage');
+  if (!state.imageViewerBaseWidth || !state.imageViewerBaseHeight) return;
+  image.style.width = `${Math.round(state.imageViewerBaseWidth * state.imageViewerScale)}px`;
+  image.style.height = `${Math.round(state.imageViewerBaseHeight * state.imageViewerScale)}px`;
+  $('#imageZoomLabel').textContent = `${Math.round(state.imageViewerScale * 100)}%`;
+}
+
+function fitImageViewer() {
+  const image = $('#imageViewerImage');
+  const stage = $('#imageViewerStage');
+  if (!image.naturalWidth || !image.naturalHeight) return;
+  const maxWidth = Math.max(160, stage.clientWidth - 40);
+  const maxHeight = Math.max(160, stage.clientHeight - 40);
+  const fitRatio = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+  state.imageViewerBaseWidth = image.naturalWidth * fitRatio;
+  state.imageViewerBaseHeight = image.naturalHeight * fitRatio;
+  state.imageViewerScale = 1;
+  updateImageViewerSize();
+}
+
+function setImageViewerScale(scale) {
+  state.imageViewerScale = Math.min(4, Math.max(.5, scale));
+  updateImageViewerSize();
+}
+
+function openImageViewer(url, name) {
+  state.imageViewerUrl = url;
+  state.imageViewerName = name;
+  state.imageViewerScale = 1;
+  const viewer = $('#imageViewer');
+  const image = $('#imageViewerImage');
+  viewer.classList.remove('hidden');
+  viewer.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('viewer-open');
+  image.onload = fitImageViewer;
+  image.src = url;
+  if (image.complete) fitImageViewer();
+  $('#imageViewerClose').focus();
+}
+
+function closeImageViewer() {
+  const viewer = $('#imageViewer');
+  viewer.classList.add('hidden');
+  viewer.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('viewer-open');
+  $('#imageViewerImage').removeAttribute('src');
+  state.imageViewerUrl = null;
+}
+
+async function downloadViewerImage() {
+  if (!state.imageViewerUrl) return;
+  const button = $('#imageDownload');
+  button.disabled = true;
+  try {
+    const response = await fetch(state.imageViewerUrl);
+    if (!response.ok) throw new Error('图片下载失败');
+    const blob = await response.blob();
+    const extension = ({ 'image/jpeg':'.jpg', 'image/png':'.png', 'image/webp':'.webp', 'image/gif':'.gif' })[blob.type] || '';
+    const requestedName = String(state.imageViewerName || '').split(/[\\/]/).pop();
+    const filename = requestedName && /\.[a-z0-9]{2,5}$/i.test(requestedName) ? requestedName : `聊天图片${extension}`;
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  } catch (err) {
+    toast(err.message || '图片下载失败');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$('#imageZoomOut').onclick = () => setImageViewerScale(state.imageViewerScale - .25);
+$('#imageZoomIn').onclick = () => setImageViewerScale(state.imageViewerScale + .25);
+$('#imageZoomReset').onclick = fitImageViewer;
+$('#imageDownload').onclick = downloadViewerImage;
+$('#imageViewerClose').onclick = closeImageViewer;
+$('#imageViewer').onclick = (event) => { if (event.target === $('#imageViewer')) closeImageViewer(); };
+$('#imageViewerImage').ondblclick = () => setImageViewerScale(state.imageViewerScale === 1 ? 2 : 1);
+$('#imageViewerStage').addEventListener('wheel', (event) => {
+  if (!event.ctrlKey && !event.metaKey) return;
+  event.preventDefault();
+  setImageViewerScale(state.imageViewerScale + (event.deltaY < 0 ? .25 : -.25));
+}, { passive:false });
+window.addEventListener('resize', () => {
+  if (!$('#imageViewer').classList.contains('hidden')) fitImageViewer();
+});
 
 async function sendMessage(scope, payload) {
   if (scope === 'direct') {
@@ -654,6 +781,7 @@ $('#deleteMessage').onclick = async () => {
 };
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !$('#messageActions').classList.contains('hidden')) closeMessageActions();
+  if (event.key === 'Escape' && !$('#imageViewer').classList.contains('hidden')) closeImageViewer();
 });
 
 async function uploadMedia(file) {
