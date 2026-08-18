@@ -46,10 +46,14 @@ textarea { min-height: 90px; resize: vertical; }
 .topbar { height: 70px; display: flex; align-items: center; gap: 12px; padding: 0 28px; background: #fff; border-bottom: 1px solid #e5e7eb; }
 .topbar h1 { font-size: 20px; margin: 0; }
 .page { padding: 28px; }
+#homePage { display: grid; gap: 16px; align-content: start; }
 .hero-card, .panel { background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 8px 32px rgba(15,23,42,.05); }
 .hero-card { max-width: 820px; }
 .hero-card h2 { margin-top: 0; }
 .hero-actions { display: flex; gap: 10px; margin-top: 20px; }
+.referral-card { display: flex; width: 100%; max-width: 820px; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 24px; border: 1px solid #e0e7ff; border-radius: 16px; background: linear-gradient(135deg, #fff 0%, #eef2ff 100%); box-shadow: 0 8px 32px rgba(15,23,42,.05); }
+.referral-card h2 { margin: 0; font-size: 20px; }
+.referral-button { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; text-decoration: none; white-space: nowrap; }
 
 .chat-layout { display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 126px); gap: 16px; }
 .contact-list, .chat-panel { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(15,23,42,.05); }
@@ -119,6 +123,9 @@ textarea { min-height: 90px; resize: vertical; }
   .mobile-only { display: inline-block; }
   .page { padding: 16px; }
   .topbar { padding: 0 16px; }
+  .referral-card { flex-direction: column; align-items: stretch; padding: 20px; }
+  .referral-card h2 { font-size: 18px; }
+  .referral-button { width: 100%; }
   .chat-layout { grid-template-columns: 1fr; min-height: auto; }
   .contact-list { max-height: 220px; }
   .messages { max-height: 55vh; }
