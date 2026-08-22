@@ -123,6 +123,16 @@ npm install
 pm2 restart fan-consult-site
 ```
 
+### 发布新版本并触发客户端更新提示
+
+网站版本统一读取 `package.json` 的 `version`。发布新功能前先递增版本号，例如：
+
+```bash
+npm version patch --no-git-tag-version
+```
+
+这会同时更新 `package.json` 和 `package-lock.json`。部署并重启服务后，已打开网站的用户会在启动、回到前台以及定时检查时发现版本变化，并看到“发现新版本 / 立即更新”提示。点击“立即更新”会重新加载页面并使用带新版本号的静态资源地址，避免继续读取旧缓存。
+
 ## 5. Nginx 配置
 
 创建：

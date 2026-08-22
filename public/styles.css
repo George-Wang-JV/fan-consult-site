@@ -120,6 +120,13 @@ textarea { min-height: 90px; resize: vertical; }
 .group-settings-form { margin: 16px 0 24px; padding: 18px; border: 1px solid #e5e7eb; border-radius: 14px; background: #f8fafc; }
 .group-settings-actions { margin-top: 4px; }
 .toast { position: fixed; z-index: 1000; right: 20px; top: 20px; background: #111827; color: #fff; padding: 12px 14px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.update-prompt { position: fixed; z-index: 1400; right: 20px; bottom: 20px; display: grid; width: min(420px, calc(100vw - 24px)); grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px 12px; padding: 16px; border: 1px solid #e0e7ff; border-radius: 16px; background: #fff; color: #1f2937; box-shadow: 0 20px 60px rgba(15,23,42,.22); }
+.update-prompt-icon { font-size: 28px; line-height: 1; }
+.update-prompt-content { display: grid; gap: 4px; min-width: 0; }
+.update-prompt-content strong { font-size: 17px; }
+.update-prompt-content .muted { font-size: 13px; }
+.update-prompt-actions { grid-column: 2; display: flex; justify-content: flex-end; gap: 8px; }
+.update-prompt-actions .ghost { padding: 9px 12px; color: #6b7280; }
 .action-backdrop { position: fixed; z-index: 900; inset: 0; display: grid; place-items: end center; padding: 18px; background: rgba(15,23,42,.42); }
 .action-sheet { width: min(460px, 100%); overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 24px 70px rgba(15,23,42,.28); }
 .action-title { padding: 14px 16px 8px; color: #6b7280; font-size: 13px; text-align: center; }
@@ -207,6 +214,7 @@ textarea { min-height: 90px; resize: vertical; }
 [data-theme="dark"] .pinned { background: #3f3210; color: #fde68a; border-color: #6b5214; }
 [data-theme="dark"] .badge { background: #273449; color: #d1d5db; }
 [data-theme="dark"] .install-help-card p { color: #cbd5e1; }
+[data-theme="dark"] .update-prompt { background: #111827; color: #e5e7eb; border-color: #3730a3; }
 [data-theme="dark"] .install-environment { background: #312e81; color: #eef2ff; }
 [data-theme="dark"] .install-help-steps li { background: #172033; }
 [data-theme="dark"] .install-app-button.installed,
@@ -265,6 +273,7 @@ textarea { min-height: 90px; resize: vertical; }
   .row-actions { width: 100%; }
   .auth-shell { padding: 14px; }
   .auth-card { padding: 24px 20px; border-radius: 14px; }
+  .update-prompt { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); left: 12px; width: auto; }
 }
 
 @media (max-width: 390px) {

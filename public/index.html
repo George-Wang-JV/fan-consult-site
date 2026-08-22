@@ -3,18 +3,30 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="app-version" content="__APP_VERSION__" />
   <meta id="themeColor" name="theme-color" content="#f5f7fb" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="废慨vc跟单中心" />
   <title>废慨vc跟单中心</title>
-  <link rel="stylesheet" href="/styles.css?v=20260822-ios-guide2" />
-  <link rel="manifest" href="/manifest.webmanifest?v=20260822-brand1" />
+  <link rel="stylesheet" href="/styles.css?v=__APP_VERSION__" />
+  <link rel="manifest" href="/manifest.webmanifest?v=__APP_VERSION__" />
   <link rel="icon" href="/icon-192.png?v=20260822-brand1" type="image/png" />
   <link rel="apple-touch-icon" href="/icon-180.png?v=20260822-brand1" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
+  <section id="updatePrompt" class="update-prompt hidden" role="alertdialog" aria-live="assertive" aria-labelledby="updatePromptTitle">
+    <div class="update-prompt-icon" aria-hidden="true">✨</div>
+    <div class="update-prompt-content">
+      <strong id="updatePromptTitle" data-i18n="newVersionAvailable">发现新版本</strong>
+      <div id="updateVersionDetails" class="muted"></div>
+    </div>
+    <div class="update-prompt-actions">
+      <button id="updateLater" class="ghost" type="button" data-i18n="updateLater">稍后</button>
+      <button id="updateNow" class="primary" type="button" data-i18n="updateNow">立即更新</button>
+    </div>
+  </section>
 
   <main id="authView" class="auth-shell">
     <section class="auth-card">
@@ -241,6 +253,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/app.js?v=20260822-ios-guide2"></script>
+  <script src="/app.js?v=__APP_VERSION__"></script>
 </body>
 </html>

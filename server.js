@@ -12,8 +12,10 @@ const bcrypt = require('bcryptjs');
 const helmet = require('helmet');
 const webpush = require('web-push');
 const { Server } = require('socket.io');
+const packageInfo = require('./package.json');
 
 const PORT = Number(process.env.PORT || 3000);
+const APP_VERSION = String(packageInfo.version || '0.0.0').trim();
 const isProd = process.env.NODE_ENV === 'production';
 const vapidPublicKey = String(process.env.VAPID_PUBLIC_KEY || '').trim();
 const vapidPrivateKey = String(process.env.VAPID_PRIVATE_KEY || '').trim();
@@ -262,7 +264,26 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.engine.use(sessionMiddleware);
 
-app.use(express.static(path.join(__dirname, 'public')));
+const publicDir = path.join(__dirname, 'public');
+const indexTemplate = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
+const noCacheHeaders = (res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+};
+
+app.get(['/', '/index.html'], (req, res) => {
+  noCacheHeaders(res);
+  res.type('html').send(indexTemplate.replaceAll('__APP_VERSION__', APP_VERSION));
+});
+
+app.get('/api/version', (req, res) => {
+  noCacheHeaders(res);
+  res.json({ version: APP_VERSION });
+});
+
+app.use(express.static(publicDir, { index:false }));
 
 function publicUser(row) {
   return row ? {

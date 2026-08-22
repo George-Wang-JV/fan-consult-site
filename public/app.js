@@ -1,5 +1,8 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
+const CLIENT_VERSION = document.querySelector('meta[name="app-version"]')?.content?.trim() || '0.0.0';
+const VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+const VERSION_CHECK_THROTTLE_MS = 30 * 1000;
 
 const state = {
   me: null,
@@ -27,6 +30,9 @@ const state = {
   imageViewerScale: 1,
   imageViewerBaseWidth: 0,
   imageViewerBaseHeight: 0,
+  latestVersion: null,
+  dismissedVersion: null,
+  lastVersionCheckAt: 0,
   languagePreference: localStorage.getItem('uiLanguage') || 'zh-CN',
   language: 'zh-CN',
   theme: localStorage.getItem('uiTheme') === 'dark' ? 'dark' : 'light'
@@ -78,6 +84,7 @@ const translations = {
     notificationsBlocked:'通知已被浏览器禁止', notificationsBlockedHint:'通知权限已被禁止，请在浏览器的网站设置中改为“允许”。',
     notificationsNotAllowed:'尚未允许通知，请点击按钮开启。', registeringPush:'正在注册后台通知服务…', notificationsEnabled:'新消息通知已开启。',
     testingPush:'订阅成功，正在发送一条测试通知…', testSent:'通知已开启，测试通知已发送。', retryNotifications:'重试开启通知', notificationFailed:'开启通知失败',
+    newVersionAvailable:'发现新版本', versionDetails:'当前版本 {current}，最新版本 {latest}', updateNow:'立即更新', updateLater:'稍后',
     morningEarly:'早上', morning:'上午', afternoon:'下午', evening:'晚上'
   },
   en: {
@@ -125,6 +132,7 @@ const translations = {
     notificationsBlocked:'Notifications are blocked', notificationsBlockedHint:'Notifications are blocked. Change this site’s browser permission to Allow.',
     notificationsNotAllowed:'Notifications have not been allowed. Click the button to enable them.', registeringPush:'Registering the background notification service…', notificationsEnabled:'Notifications are enabled.',
     testingPush:'Subscription saved. Sending a test notification…', testSent:'Notifications enabled and test sent.', retryNotifications:'Retry notifications', notificationFailed:'Could not enable notifications',
+    newVersionAvailable:'New version available', versionDetails:'Current {current}, latest {latest}', updateNow:'Update now', updateLater:'Later',
     morningEarly:'early morning', morning:'morning', afternoon:'afternoon', evening:'evening'
   }
 };
@@ -157,6 +165,7 @@ function applyLanguage(preference = state.languagePreference, rerender = true) {
   $('#mobileMenu').setAttribute('aria-label', tr('openMenu'));
   $('#closeIosInstallVideo').title = tr('closeInstallTutorial');
   $('#closeIosInstallVideo').setAttribute('aria-label', tr('closeInstallTutorial'));
+  renderUpdateVersionDetails();
   $$('[data-language]').forEach(button => button.classList.toggle('active', button.dataset.language === preference));
   updateInstallButton();
   if (!rerender || !state.me) return;
@@ -330,6 +339,46 @@ function isIosDevice() {
 
 function isStandaloneApp() {
   return navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+}
+
+function renderUpdateVersionDetails() {
+  if (!state.latestVersion) return;
+  $('#updateVersionDetails').textContent = tr('versionDetails', {
+    current:CLIENT_VERSION,
+    latest:state.latestVersion
+  });
+}
+
+function showUpdatePrompt(latestVersion) {
+  state.latestVersion = latestVersion;
+  renderUpdateVersionDetails();
+  $('#updatePrompt').classList.remove('hidden');
+}
+
+function hideUpdatePrompt() {
+  $('#updatePrompt').classList.add('hidden');
+}
+
+async function checkAppVersion(force = false) {
+  if (!navigator.onLine) return;
+  const now = Date.now();
+  if (!force && now - state.lastVersionCheckAt < VERSION_CHECK_THROTTLE_MS) return;
+  state.lastVersionCheckAt = now;
+  try {
+    const response = await fetch(`/api/version?t=${now}`, {
+      cache:'no-store',
+      headers:{ Accept:'application/json' }
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    const latestVersion = String(data.version || '').trim();
+    if (!latestVersion) return;
+    state.latestVersion = latestVersion;
+    if (latestVersion !== CLIENT_VERSION && state.dismissedVersion !== latestVersion) showUpdatePrompt(latestVersion);
+    else if (latestVersion === CLIENT_VERSION) hideUpdatePrompt();
+  } catch {
+    // 离线或网络波动时保持当前版本运行，下次回到前台后再检查。
+  }
 }
 
 function updateInstallButton() {
@@ -780,11 +829,22 @@ $$('[data-language]').forEach(button => button.onclick = () => {
   $('#languageButton').setAttribute('aria-expanded', 'false');
 });
 $('#themeToggle').onclick = () => applyTheme(state.theme === 'dark' ? 'light' : 'dark');
+$('#updateNow').onclick = () => window.location.reload();
+$('#updateLater').onclick = () => {
+  state.dismissedVersion = state.latestVersion;
+  hideUpdatePrompt();
+};
 navigator.serviceWorker?.addEventListener('message', (event) => {
   if (event.data?.type === 'push-subscription-changed') setupPush(false);
 });
-document.addEventListener('visibilitychange', updatePresence);
-window.addEventListener('focus', updatePresence);
+document.addEventListener('visibilitychange', () => {
+  updatePresence();
+  if (!document.hidden) void checkAppVersion();
+});
+window.addEventListener('focus', () => {
+  updatePresence();
+  void checkAppVersion();
+});
 window.addEventListener('blur', updatePresence);
 window.addEventListener('resize', () => { if (window.innerWidth > 820) setSidebarOpen(false); });
 document.addEventListener('click', (event) => {
@@ -1473,6 +1533,8 @@ function scrollBottom(el) { requestAnimationFrame(() => { el.scrollTop = el.scro
   applyLanguage(state.languagePreference, false);
   applyTheme(state.theme);
   void registerAppServiceWorker();
+  void checkAppVersion(true);
+  window.setInterval(() => void checkAppVersion(), VERSION_CHECK_INTERVAL_MS);
   try {
     const { user } = await api('/api/me');
     state.me = user;
