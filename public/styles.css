@@ -137,6 +137,8 @@ textarea { min-height: 90px; resize: vertical; }
 .install-help-card h3 { margin: 16px 0 10px; font-size: 22px; }
 .install-environment { display: inline-flex; margin-bottom: 12px; padding: 5px 10px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 13px; font-weight: 750; }
 .install-help-card p { margin: 0 0 18px; color: #4b5563; line-height: 1.7; }
+.install-help-video-wrap { width: 100%; margin: 0 0 18px; overflow: hidden; border-radius: 16px; background: #030712; }
+.install-help-video { display: block; width: auto; max-width: 100%; height: min(52vh, 480px); margin: 0 auto; background: #000; }
 .install-help-steps { display: grid; gap: 10px; margin: 0 0 22px; padding: 0; list-style: none; text-align: left; }
 .install-help-steps li { display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #f8fafc; }
 .install-help-steps li > span { display: inline-grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: #4f46e5; color: #fff; font-size: 13px; font-weight: 800; }
@@ -238,6 +240,7 @@ textarea { min-height: 90px; resize: vertical; }
   .install-help-backdrop { place-items: end center; padding: 12px; }
   .install-help-card { max-height: calc(100dvh - 24px); overflow-y: auto; padding: 22px 18px; border-radius: 20px; }
   .install-help-card h3 { font-size: 20px; }
+  .install-help-video { height: min(48vh, 430px); }
   .install-help-steps li { align-items: start; }
   .chat-layout { grid-template-columns: minmax(0, 1fr); min-height: auto; gap: 12px; }
   .contact-list { max-height: 220px; }

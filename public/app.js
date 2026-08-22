@@ -369,7 +369,7 @@ function installGuideFor(environment) {
   if (environment.kind === 'wechat') return { summary:'installGuideWechat', steps:['openBrowserStep1','openBrowserStep2','openBrowserStep3'], copy:true };
   if (environment.kind === 'qq') return { summary:'installGuideQq', steps:['openBrowserStep1','openBrowserStep2','openBrowserStep3'], copy:true };
   if (environment.kind === 'huawei') return { summary:'installGuideHuawei', steps:['huaweiStep1','huaweiStep2','huaweiStep3'] };
-  if (environment.kind === 'ios') return { summary:'installGuideIos', steps:['iosStep1','iosStep2','iosStep3'] };
+  if (environment.kind === 'ios') return { summary:'installGuideIos', steps:['iosStep1','iosStep2','iosStep3'], video:true };
   if (environment.isWindows) return { summary:'installGuideDesktop', steps:['desktopStep1','desktopStep2','desktopStep3'], windowsShortcut:true };
   return { summary:'installGuideMobile', steps:['mobileStep1','mobileStep2','mobileStep3'], copy:environment.isMobile };
 }
@@ -379,6 +379,11 @@ function showInstallHelp(message = '') {
   const guide = installGuideFor(environment);
   $('#installEnvironment').textContent = tr('installDetected', { browser:environment.name });
   $('#installHelpText').textContent = message || tr(guide.summary);
+  $('#iosInstallVideoWrap').classList.toggle('hidden', !guide.video);
+  if (!guide.video) {
+    $('#iosInstallVideo').pause();
+    $('#iosInstallVideo').currentTime = 0;
+  }
   $('#installHelpSteps').innerHTML = guide.steps.map((key, index) => (
     `<li><span>${index + 1}</span><div>${escapeHtml(tr(key))}</div></li>`
   )).join('');
@@ -396,6 +401,8 @@ function closeInstallHelp() {
   dialog.classList.add('hidden');
   dialog.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('dialog-open');
+  $('#iosInstallVideo').pause();
+  $('#iosInstallVideo').currentTime = 0;
   if (!$('#installApp').disabled) $('#installApp').focus();
 }
 
