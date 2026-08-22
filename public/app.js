@@ -84,7 +84,7 @@ const translations = {
     notificationsBlocked:'通知已被浏览器禁止', notificationsBlockedHint:'通知权限已被禁止，请在浏览器的网站设置中改为“允许”。',
     notificationsNotAllowed:'尚未允许通知，请点击按钮开启。', registeringPush:'正在注册后台通知服务…', notificationsEnabled:'新消息通知已开启。',
     testingPush:'订阅成功，正在发送一条测试通知…', testSent:'通知已开启，测试通知已发送。', retryNotifications:'重试开启通知', notificationFailed:'开启通知失败',
-    newVersionAvailable:'发现新版本', versionDetails:'当前版本 {current}，最新版本 {latest}', updateNow:'立即更新', updateLater:'稍后',
+    currentVersion:'当前版本', newVersionAvailable:'发现新版本', versionDetails:'当前版本 {current}，最新版本 {latest}', updateNow:'立即更新', updateLater:'稍后',
     morningEarly:'早上', morning:'上午', afternoon:'下午', evening:'晚上'
   },
   en: {
@@ -132,7 +132,7 @@ const translations = {
     notificationsBlocked:'Notifications are blocked', notificationsBlockedHint:'Notifications are blocked. Change this site’s browser permission to Allow.',
     notificationsNotAllowed:'Notifications have not been allowed. Click the button to enable them.', registeringPush:'Registering the background notification service…', notificationsEnabled:'Notifications are enabled.',
     testingPush:'Subscription saved. Sending a test notification…', testSent:'Notifications enabled and test sent.', retryNotifications:'Retry notifications', notificationFailed:'Could not enable notifications',
-    newVersionAvailable:'New version available', versionDetails:'Current {current}, latest {latest}', updateNow:'Update now', updateLater:'Later',
+    currentVersion:'Current version', newVersionAvailable:'New version available', versionDetails:'Current {current}, latest {latest}', updateNow:'Update now', updateLater:'Later',
     morningEarly:'early morning', morning:'morning', afternoon:'afternoon', evening:'evening'
   }
 };

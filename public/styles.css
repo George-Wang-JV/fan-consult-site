@@ -41,7 +41,9 @@ textarea { min-height: 90px; resize: vertical; }
 .notification-status { margin: 14px 0 0; font-size: 14px; }
 .notification-status.success { color: #047857; }
 .notification-status.error { color: #b91c1c; font-weight: 600; }
-.sidebar .ghost { margin-top: auto; color: #d1d5db; padding: 10px; }
+.sidebar-footer { margin-top: auto; display: grid; gap: 3px; }
+.sidebar .ghost { color: #d1d5db; padding: 10px; }
+.sidebar-version { color: #6b7280; font-size: 11px; line-height: 1.4; text-align: center; user-select: text; }
 .content { min-width: 0; }
 .topbar { height: 70px; display: flex; align-items: center; gap: 12px; padding: 0 28px; background: #fff; border-bottom: 1px solid #e5e7eb; }
 .topbar h1 { font-size: 20px; margin: 0; }
