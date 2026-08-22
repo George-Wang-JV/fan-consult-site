@@ -39,11 +39,22 @@ const translations = {
     direct:'一对一咨询', groups:'粉丝交流群', admin:'管理后台', logout:'退出登录', followSystem:'跟随系统',
     homeDescription:'没有审核，畅所欲言', startConsultation:'开始咨询', viewGroups:'查看群聊',
     enableNotifications:'开启新消息通知', notificationHint:'点击开启后，浏览器会请求通知权限。',
-    installApp:'安装到桌面', installIos:'添加到主屏幕', installHelpTitle:'添加到桌面', gotIt:'知道了',
+    installApp:'安装到桌面', installIos:'添加到主屏幕', installedApp:'已添加到桌面', installingApp:'正在完成安装…', installHelpTitle:'添加到桌面', gotIt:'知道了',
     installIosHelp:'请使用 Safari 打开本站，点击浏览器的“分享”按钮，然后选择“添加到主屏幕”。',
     installBrowserHelp:'如果浏览器没有弹出安装框，请打开浏览器菜单，选择“安装应用”或“添加到主屏幕”。',
     installHttpsHelp:'安装应用需要通过 HTTPS 网站访问，请打开本站的 HTTPS 地址后重试。',
     installed:'应用已安装到桌面', installDismissed:'已取消安装，你可以稍后再次点击。', backgroundServiceFailed:'后台服务注册失败，请刷新页面后重试。',
+    installDetected:'当前环境：{browser}', installGuideWechat:'微信内置浏览器通常不会显示网页安装按钮，请先转到系统浏览器。',
+    installGuideQq:'QQ 内置浏览器通常需要先转到系统浏览器，再添加到桌面。', installGuideHuawei:'华为浏览器支持把 PWA 直接添加到手机桌面。',
+    installGuideIos:'iPhone/iPad 需要从浏览器的分享菜单添加到主屏幕。', installGuideDesktop:'当前浏览器没有返回系统安装弹窗，请使用浏览器菜单或 Windows 备用快捷方式。',
+    installGuideMobile:'当前浏览器没有返回系统安装弹窗，请从浏览器菜单添加到手机桌面。',
+    openBrowserStep1:'点击右上角“…”菜单', openBrowserStep2:'选择“在浏览器打开”', openBrowserStep3:'在系统浏览器中再次点击网页上的“安装到桌面”',
+    huaweiStep1:'点击浏览器右下角“∷”菜单', huaweiStep2:'选择“添加至”', huaweiStep3:'选择“桌面”并确认',
+    iosStep1:'点击浏览器的“分享”按钮', iosStep2:'向下滑动并选择“添加到主屏幕”', iosStep3:'点击右上角“添加”',
+    desktopStep1:'先查看地址栏右侧是否有安装图标', desktopStep2:'如果没有，打开右上角菜单，寻找“安装应用”“将此站点作为应用安装”或“创建快捷方式”', desktopStep3:'国产浏览器仍没有该选项时，使用下方 Windows 快捷方式备用按钮',
+    mobileStep1:'打开浏览器的“菜单”或“更多”', mobileStep2:'选择“添加到桌面”“添加到主屏幕”或“安装应用”', mobileStep3:'允许浏览器创建桌面图标',
+    copyWebsiteUrl:'复制网站地址', urlCopied:'网站地址已复制', copyUrlFailed:'复制失败，请长按地址栏复制网址。',
+    downloadWindowsShortcut:'Windows备用：下载快捷方式', shortcutDownloaded:'快捷方式已下载，请将它移动到桌面后双击使用。',
     referralTitle:'使用我的邀请码注册享受返佣！', registerNow:'点我注册', selectContact:'请选择联系人',
     messagePlaceholder:'输入消息…', groupMessagePlaceholder:'发送群消息…', send:'发送', createGroup:'创建粉丝群',
     groupName:'群名称', description:'简介', createGroupChat:'创建群聊', groupManagement:'群管理',
@@ -75,11 +86,22 @@ const translations = {
     direct:'One-to-one', groups:'Fan groups', admin:'Admin', logout:'Log out', followSystem:'Use system language',
     homeDescription:'No review — speak freely.', startConsultation:'Start consultation', viewGroups:'View groups',
     enableNotifications:'Enable notifications', notificationHint:'Click Enable to allow browser notifications.',
-    installApp:'Install app', installIos:'Add to Home Screen', installHelpTitle:'Install this app', gotIt:'Got it',
+    installApp:'Install app', installIos:'Add to Home Screen', installedApp:'Added to desktop', installingApp:'Finishing installation…', installHelpTitle:'Install this app', gotIt:'Got it',
     installIosHelp:'Open this site in Safari, tap the Share button, then choose Add to Home Screen.',
     installBrowserHelp:'If no install dialog appears, open the browser menu and choose Install app or Add to Home Screen.',
     installHttpsHelp:'App installation requires HTTPS. Open the HTTPS version of this site and try again.',
     installed:'The app has been installed', installDismissed:'Installation cancelled. You can try again later.', backgroundServiceFailed:'The background service could not be registered. Refresh the page and try again.',
+    installDetected:'Detected: {browser}', installGuideWechat:'WeChat usually does not show web app installation. Open this page in your system browser first.',
+    installGuideQq:'The QQ in-app browser usually needs to hand this page off to your system browser first.', installGuideHuawei:'Huawei Browser can add this PWA directly to your Home screen.',
+    installGuideIos:'On iPhone/iPad, add the app from the browser Share menu.', installGuideDesktop:'The browser did not provide an automatic install prompt. Use its menu or the Windows shortcut fallback.',
+    installGuideMobile:'The browser did not provide an automatic install prompt. Add it from the browser menu.',
+    openBrowserStep1:'Open the “…” menu in the top-right corner', openBrowserStep2:'Choose “Open in browser”', openBrowserStep3:'In the system browser, tap “Install app” on this page again',
+    huaweiStep1:'Open the “∷” menu at the bottom-right', huaweiStep2:'Choose “Add to”', huaweiStep3:'Choose “Desktop” and confirm',
+    iosStep1:'Tap the browser Share button', iosStep2:'Scroll down and choose Add to Home Screen', iosStep3:'Tap Add in the top-right corner',
+    desktopStep1:'First look for an install icon on the right side of the address bar', desktopStep2:'Otherwise open the top-right menu and look for Install app, Install this site as an app, or Create shortcut', desktopStep3:'If a domestic browser has no such option, use the Windows shortcut fallback below',
+    mobileStep1:'Open the browser Menu or More options', mobileStep2:'Choose Add to desktop, Add to Home Screen, or Install app', mobileStep3:'Allow the browser to create a Home screen icon',
+    copyWebsiteUrl:'Copy website address', urlCopied:'Website address copied', copyUrlFailed:'Could not copy it. Please copy the URL from the address bar.',
+    downloadWindowsShortcut:'Windows fallback: download shortcut', shortcutDownloaded:'Shortcut downloaded. Move it to the desktop and double-click it to open the app.',
     referralTitle:'Register with my invitation link to enjoy rebates!', registerNow:'Register now', selectContact:'Select a contact',
     messagePlaceholder:'Type a message…', groupMessagePlaceholder:'Send a group message…', send:'Send', createGroup:'Create fan group',
     groupName:'Group name', description:'Description', createGroupChat:'Create group', groupManagement:'Group management',
@@ -312,15 +334,56 @@ function updateInstallButton() {
   const button = $('#installApp');
   if (!button) return;
   const installed = isStandaloneApp();
-  button.classList.toggle('hidden', installed);
-  if (installed) return;
+  button.classList.remove('hidden');
+  button.disabled = installed;
+  button.classList.toggle('installed', installed);
+  $('#installAppIcon').textContent = installed ? '✓' : '📲';
   const label = button.querySelector('[data-i18n="installApp"]');
-  if (label) label.textContent = tr(isIosDevice() ? 'installIos' : 'installApp');
+  if (label) label.textContent = tr(installed ? 'installedApp' : (isIosDevice() ? 'installIos' : 'installApp'));
   button.classList.toggle('install-ready', Boolean(state.deferredInstallPrompt));
 }
 
-function showInstallHelp(message) {
-  $('#installHelpText').textContent = message;
+function detectInstallEnvironment() {
+  const ua = navigator.userAgent || '';
+  const isWindows = /Windows/i.test(ua);
+  const isMobile = isIosDevice() || /Android|Mobile/i.test(ua);
+  let kind = isWindows ? 'desktop' : (isMobile ? 'mobile' : 'desktop');
+  let name = isWindows ? 'Windows 浏览器' : '手机浏览器';
+  if (/MicroMessenger/i.test(ua)) { kind = 'wechat'; name = '微信内置浏览器'; }
+  else if (/(?:^|[;\s])QQ\//i.test(ua)) { kind = 'qq'; name = 'QQ 内置浏览器'; }
+  else if (isIosDevice()) { kind = 'ios'; name = /CriOS/i.test(ua) ? 'iPhone Chrome' : (/EdgiOS/i.test(ua) ? 'iPhone Edge' : 'iPhone/iPad 浏览器'); }
+  else if (/HuaweiBrowser/i.test(ua)) { kind = 'huawei'; name = '华为浏览器'; }
+  else if (/MiuiBrowser/i.test(ua)) name = '小米浏览器';
+  else if (/MQQBrowser/i.test(ua)) name = 'QQ浏览器';
+  else if (/UCBrowser|UCWEB/i.test(ua)) name = 'UC浏览器';
+  else if (/360SE|360EE|QihooBrowser/i.test(ua)) name = '360浏览器';
+  else if (/baidubrowser|BIDUBrowser/i.test(ua)) name = '百度浏览器';
+  else if (/Quark/i.test(ua)) name = '夸克浏览器';
+  else if (/Edg/i.test(ua)) name = 'Microsoft Edge';
+  else if (/Chrome/i.test(ua)) name = 'Google Chrome';
+  else if (/Safari/i.test(ua)) name = 'Safari';
+  return { kind, name, isWindows, isMobile };
+}
+
+function installGuideFor(environment) {
+  if (environment.kind === 'wechat') return { summary:'installGuideWechat', steps:['openBrowserStep1','openBrowserStep2','openBrowserStep3'], copy:true };
+  if (environment.kind === 'qq') return { summary:'installGuideQq', steps:['openBrowserStep1','openBrowserStep2','openBrowserStep3'], copy:true };
+  if (environment.kind === 'huawei') return { summary:'installGuideHuawei', steps:['huaweiStep1','huaweiStep2','huaweiStep3'] };
+  if (environment.kind === 'ios') return { summary:'installGuideIos', steps:['iosStep1','iosStep2','iosStep3'] };
+  if (environment.isWindows) return { summary:'installGuideDesktop', steps:['desktopStep1','desktopStep2','desktopStep3'], windowsShortcut:true };
+  return { summary:'installGuideMobile', steps:['mobileStep1','mobileStep2','mobileStep3'], copy:environment.isMobile };
+}
+
+function showInstallHelp(message = '') {
+  const environment = detectInstallEnvironment();
+  const guide = installGuideFor(environment);
+  $('#installEnvironment').textContent = tr('installDetected', { browser:environment.name });
+  $('#installHelpText').textContent = message || tr(guide.summary);
+  $('#installHelpSteps').innerHTML = guide.steps.map((key, index) => (
+    `<li><span>${index + 1}</span><div>${escapeHtml(tr(key))}</div></li>`
+  )).join('');
+  $('#copyInstallUrl').classList.toggle('hidden', !guide.copy);
+  $('#downloadWindowsShortcut').classList.toggle('hidden', !guide.windowsShortcut);
   $('#installHelp').classList.remove('hidden');
   $('#installHelp').setAttribute('aria-hidden', 'false');
   document.body.classList.add('dialog-open');
@@ -333,7 +396,40 @@ function closeInstallHelp() {
   dialog.classList.add('hidden');
   dialog.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('dialog-open');
-  if (!$('#installApp').classList.contains('hidden')) $('#installApp').focus();
+  if (!$('#installApp').disabled) $('#installApp').focus();
+}
+
+async function copyInstallUrl() {
+  const url = `${location.origin}/`;
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+    else {
+      const input = document.createElement('textarea');
+      input.value = url;
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+      input.select();
+      if (!document.execCommand('copy')) throw new Error('copy failed');
+      input.remove();
+    }
+    toast(tr('urlCopied'));
+  } catch {
+    toast(tr('copyUrlFailed'));
+  }
+}
+
+function downloadWindowsShortcut() {
+  const content = `[InternetShortcut]\r\nURL=${location.origin}/\r\n`;
+  const url = URL.createObjectURL(new Blob([content], { type:'application/internet-shortcut' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = '废慨VC咨询中心.url';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast(tr('shortcutDownloaded'));
 }
 
 async function handleInstallApp() {
@@ -350,14 +446,18 @@ async function handleInstallApp() {
     state.deferredInstallPrompt = null;
     await promptEvent.prompt();
     const { outcome } = await promptEvent.userChoice;
-    if (outcome === 'accepted') $('#installApp').classList.add('hidden');
+    if (outcome === 'accepted') {
+      $('#installAppIcon').textContent = '✓';
+      $('#installApp').querySelector('[data-i18n="installApp"]').textContent = tr('installingApp');
+      $('#installApp').disabled = true;
+    }
     else {
       toast(tr('installDismissed'));
       updateInstallButton();
     }
     return;
   }
-  showInstallHelp(tr(isIosDevice() ? 'installIosHelp' : 'installBrowserHelp'));
+  showInstallHelp();
 }
 
 async function registerAppServiceWorker() {
@@ -616,6 +716,8 @@ $('#sidebarBackdrop').onclick = () => setSidebarOpen(false);
 $('#enableNotifications').onclick = () => setupPush(true);
 $('#installApp').onclick = handleInstallApp;
 $('#closeInstallHelp').onclick = closeInstallHelp;
+$('#copyInstallUrl').onclick = copyInstallUrl;
+$('#downloadWindowsShortcut').onclick = downloadWindowsShortcut;
 $('#installHelp').onclick = (event) => { if (event.target === $('#installHelp')) closeInstallHelp(); };
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault();
