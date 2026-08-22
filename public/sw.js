@@ -4,7 +4,7 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data?.json() || {}; } catch { data = { body: event.data?.text() || '你有一条新消息' }; }
-  event.waitUntil(self.registration.showNotification(data.title || '粉丝咨询中心', {
+  event.waitUntil(self.registration.showNotification(data.title || '废慨vc跟单中心', {
     body: data.body || '你有一条新消息',
     tag: data.tag || 'new-message',
     renotify: true,

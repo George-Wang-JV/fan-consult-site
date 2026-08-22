@@ -229,7 +229,7 @@ function renderHomeGreeting() {
     return;
   }
   const adminTitle = state.me.isAdmin ? ' 管理员' : '';
-  const destination = state.me.isAdmin ? '废慨vc咨询中心后台' : '废慨vc咨询中心';
+  const destination = state.me.isAdmin ? '废慨vc跟单中心后台' : '废慨vc跟单中心';
   $('#homeGreeting').innerHTML = `尊敬的 ${nickname}${adminTitle}，北京时间${period}好，欢迎来到${destination}。`;
 }
 
@@ -424,7 +424,7 @@ function downloadWindowsShortcut() {
   const url = URL.createObjectURL(new Blob([content], { type:'application/internet-shortcut' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = '废慨VC咨询中心.url';
+  link.download = '废慨vc跟单中心.url';
   document.body.appendChild(link);
   link.click();
   link.remove();
