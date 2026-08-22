@@ -12,6 +12,8 @@ const state = {
   pushEndpoint: null,
   directUnread: {},
   groupUnread: {},
+  deferredInstallPrompt: null,
+  serviceWorkerRegistrationPromise: null,
   pendingRoute: null,
   actionMessage: null,
   pendingMedia: null,
@@ -37,6 +39,11 @@ const translations = {
     direct:'一对一咨询', groups:'粉丝交流群', admin:'管理后台', logout:'退出登录', followSystem:'跟随系统',
     homeDescription:'没有审核，畅所欲言', startConsultation:'开始咨询', viewGroups:'查看群聊',
     enableNotifications:'开启新消息通知', notificationHint:'点击开启后，浏览器会请求通知权限。',
+    installApp:'安装到桌面', installIos:'添加到主屏幕', installHelpTitle:'添加到桌面', gotIt:'知道了',
+    installIosHelp:'请使用 Safari 打开本站，点击浏览器的“分享”按钮，然后选择“添加到主屏幕”。',
+    installBrowserHelp:'如果浏览器没有弹出安装框，请打开浏览器菜单，选择“安装应用”或“添加到主屏幕”。',
+    installHttpsHelp:'安装应用需要通过 HTTPS 网站访问，请打开本站的 HTTPS 地址后重试。',
+    installed:'应用已安装到桌面', installDismissed:'已取消安装，你可以稍后再次点击。', backgroundServiceFailed:'后台服务注册失败，请刷新页面后重试。',
     referralTitle:'使用我的邀请码注册享受返佣！', registerNow:'点我注册', selectContact:'请选择联系人',
     messagePlaceholder:'输入消息…', groupMessagePlaceholder:'发送群消息…', send:'发送', createGroup:'创建粉丝群',
     groupName:'群名称', description:'简介', createGroupChat:'创建群聊', groupManagement:'群管理',
@@ -68,6 +75,11 @@ const translations = {
     direct:'One-to-one', groups:'Fan groups', admin:'Admin', logout:'Log out', followSystem:'Use system language',
     homeDescription:'No review — speak freely.', startConsultation:'Start consultation', viewGroups:'View groups',
     enableNotifications:'Enable notifications', notificationHint:'Click Enable to allow browser notifications.',
+    installApp:'Install app', installIos:'Add to Home Screen', installHelpTitle:'Install this app', gotIt:'Got it',
+    installIosHelp:'Open this site in Safari, tap the Share button, then choose Add to Home Screen.',
+    installBrowserHelp:'If no install dialog appears, open the browser menu and choose Install app or Add to Home Screen.',
+    installHttpsHelp:'App installation requires HTTPS. Open the HTTPS version of this site and try again.',
+    installed:'The app has been installed', installDismissed:'Installation cancelled. You can try again later.', backgroundServiceFailed:'The background service could not be registered. Refresh the page and try again.',
     referralTitle:'Register with my invitation link to enjoy rebates!', registerNow:'Register now', selectContact:'Select a contact',
     messagePlaceholder:'Type a message…', groupMessagePlaceholder:'Send a group message…', send:'Send', createGroup:'Create fan group',
     groupName:'Group name', description:'Description', createGroupChat:'Create group', groupManagement:'Group management',
@@ -122,6 +134,7 @@ function applyLanguage(preference = state.languagePreference, rerender = true) {
   $('#languageButton').setAttribute('aria-label', tr('language'));
   $('#mobileMenu').setAttribute('aria-label', tr('openMenu'));
   $$('[data-language]').forEach(button => button.classList.toggle('active', button.dataset.language === preference));
+  updateInstallButton();
   if (!rerender || !state.me) return;
   renderHomeGreeting();
   renderMeCard();
@@ -214,6 +227,7 @@ async function showApp() {
   renderMeCard();
   $('#adminBtn').classList.toggle('hidden', !state.me.isAdmin);
   renderHomeGreeting();
+  updateInstallButton();
   connectSocket();
   await Promise.all([setupPush(false), loadDirectUnread()]);
   await openInitialRoute();
@@ -294,6 +308,79 @@ function isStandaloneApp() {
   return navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 }
 
+function updateInstallButton() {
+  const button = $('#installApp');
+  if (!button) return;
+  const installed = isStandaloneApp();
+  button.classList.toggle('hidden', installed);
+  if (installed) return;
+  const label = button.querySelector('[data-i18n="installApp"]');
+  if (label) label.textContent = tr(isIosDevice() ? 'installIos' : 'installApp');
+  button.classList.toggle('install-ready', Boolean(state.deferredInstallPrompt));
+}
+
+function showInstallHelp(message) {
+  $('#installHelpText').textContent = message;
+  $('#installHelp').classList.remove('hidden');
+  $('#installHelp').setAttribute('aria-hidden', 'false');
+  document.body.classList.add('dialog-open');
+  $('#closeInstallHelp').focus();
+}
+
+function closeInstallHelp() {
+  const dialog = $('#installHelp');
+  if (dialog.classList.contains('hidden')) return;
+  dialog.classList.add('hidden');
+  dialog.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('dialog-open');
+  if (!$('#installApp').classList.contains('hidden')) $('#installApp').focus();
+}
+
+async function handleInstallApp() {
+  if (isStandaloneApp()) {
+    updateInstallButton();
+    return;
+  }
+  if (!window.isSecureContext) {
+    showInstallHelp(tr('installHttpsHelp'));
+    return;
+  }
+  if (state.deferredInstallPrompt) {
+    const promptEvent = state.deferredInstallPrompt;
+    state.deferredInstallPrompt = null;
+    await promptEvent.prompt();
+    const { outcome } = await promptEvent.userChoice;
+    if (outcome === 'accepted') $('#installApp').classList.add('hidden');
+    else {
+      toast(tr('installDismissed'));
+      updateInstallButton();
+    }
+    return;
+  }
+  showInstallHelp(tr(isIosDevice() ? 'installIosHelp' : 'installBrowserHelp'));
+}
+
+async function registerAppServiceWorker() {
+  if (!window.isSecureContext || !('serviceWorker' in navigator)) return null;
+  if (!state.serviceWorkerRegistrationPromise) {
+    state.serviceWorkerRegistrationPromise = navigator.serviceWorker.register('/sw.js', { updateViaCache:'none' })
+      .then(async (registration) => {
+        await registration.update().catch(() => {});
+        return registration;
+      })
+      .catch((err) => {
+        state.serviceWorkerRegistrationPromise = null;
+        throw err;
+      });
+  }
+  try {
+    return await state.serviceWorkerRegistrationPromise;
+  } catch (err) {
+    console.error('Service Worker registration failed:', err);
+    return null;
+  }
+}
+
 function subscriptionUsesKey(subscription, publicKey) {
   const currentKey = subscription?.options?.applicationServerKey;
   if (!currentKey) return true;
@@ -334,8 +421,8 @@ async function setupPush(requestPermission) {
     }
 
     setNotificationStatus(tr('registeringPush'));
-    const registration = await navigator.serviceWorker.register('/sw.js', { updateViaCache:'none' });
-    await registration.update().catch(() => {});
+    const registration = await registerAppServiceWorker();
+    if (!registration) throw new Error(tr('backgroundServiceFailed'));
     await navigator.serviceWorker.ready;
     const { publicKey } = await api('/api/push/public-key');
     let subscription = await registration.pushManager.getSubscription();
@@ -527,6 +614,20 @@ function setSidebarOpen(open) {
 $('#mobileMenu').onclick = () => setSidebarOpen(!$('.sidebar').classList.contains('open'));
 $('#sidebarBackdrop').onclick = () => setSidebarOpen(false);
 $('#enableNotifications').onclick = () => setupPush(true);
+$('#installApp').onclick = handleInstallApp;
+$('#closeInstallHelp').onclick = closeInstallHelp;
+$('#installHelp').onclick = (event) => { if (event.target === $('#installHelp')) closeInstallHelp(); };
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  state.deferredInstallPrompt = event;
+  updateInstallButton();
+});
+window.addEventListener('appinstalled', () => {
+  state.deferredInstallPrompt = null;
+  closeInstallHelp();
+  updateInstallButton();
+  toast(tr('installed'));
+});
 $('#languageButton').onclick = (event) => {
   event.stopPropagation();
   const menu = $('#languageMenu');
@@ -556,6 +657,7 @@ document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
   setSidebarOpen(false);
   $('#languageMenu').classList.add('hidden');
+  closeInstallHelp();
   if (state.activeGroup) closeGroupChat(false);
 });
 
@@ -1226,6 +1328,7 @@ function scrollBottom(el) { requestAnimationFrame(() => { el.scrollTop = el.scro
 (async function init() {
   applyLanguage(state.languagePreference, false);
   applyTheme(state.theme);
+  void registerAppServiceWorker();
   try {
     const { user } = await api('/api/me');
     state.me = user;

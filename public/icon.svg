@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="咨询中心">
+  <rect width="512" height="512" rx="112" fill="#4f46e5"/>
+  <rect x="92" y="112" width="328" height="240" rx="72" fill="#fff"/>
+  <path d="M170 326 122 408l126-64z" fill="#fff"/>
+  <circle cx="184" cy="232" r="18" fill="#4f46e5"/>
+  <circle cx="256" cy="232" r="18" fill="#4f46e5"/>
+  <circle cx="328" cy="232" r="18" fill="#4f46e5"/>
+</svg>

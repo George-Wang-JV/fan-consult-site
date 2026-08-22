@@ -5,9 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta id="themeColor" name="theme-color" content="#f5f7fb" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="咨询中心" />
   <title>粉丝咨询中心</title>
   <link rel="stylesheet" href="/styles.css" />
   <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icon-180.png" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -75,6 +79,7 @@
             <button class="primary" data-goto="direct" data-i18n="startConsultation">开始咨询</button>
             <button class="secondary" data-goto="groups" data-i18n="viewGroups">查看群聊</button>
             <button id="enableNotifications" class="secondary">🔔 <span data-i18n="enableNotifications">开启新消息通知</span></button>
+            <button id="installApp" class="secondary install-app-button hidden" type="button">📲 <span data-i18n="installApp">安装到桌面</span></button>
           </div>
           <p id="notificationStatus" class="notification-status muted" aria-live="polite" data-i18n="notificationHint">点击开启后，浏览器会请求通知权限。</p>
         </div>
@@ -187,6 +192,15 @@
       <button id="recallMessage" type="button" class="action-row">↩️ <span data-i18n="recallAll">撤回（所有人不可见）</span></button>
       <button id="deleteMessage" type="button" class="action-row danger-text">🗑️ <span data-i18n="deleteSelf">删除（仅自己不可见）</span></button>
       <button id="closeMessageActions" type="button" class="action-row cancel-row" data-i18n="cancel">取消</button>
+    </section>
+  </div>
+
+  <div id="installHelp" class="install-help-backdrop hidden" role="presentation" aria-hidden="true">
+    <section class="install-help-card" role="dialog" aria-modal="true" aria-labelledby="installHelpTitle">
+      <div class="install-help-icon" aria-hidden="true">📲</div>
+      <h3 id="installHelpTitle" data-i18n="installHelpTitle">添加到桌面</h3>
+      <p id="installHelpText"></p>
+      <button id="closeInstallHelp" class="primary" type="button" data-i18n="gotIt">知道了</button>
     </section>
   </div>
 
