@@ -39,16 +39,16 @@ const translations = {
     direct:'一对一咨询', groups:'粉丝交流群', admin:'管理后台', logout:'退出登录', followSystem:'跟随系统',
     homeDescription:'没有审核，畅所欲言', startConsultation:'开始咨询', viewGroups:'查看群聊',
     enableNotifications:'开启新消息通知', notificationHint:'点击开启后，浏览器会请求通知权限。',
-    installApp:'安装到桌面', installIos:'添加到主屏幕', installedApp:'已添加到桌面', installingApp:'正在完成安装…', installHelpTitle:'添加到桌面', gotIt:'知道了',
+    installApp:'添加到主屏幕', installIos:'添加到主屏幕', installedApp:'已添加到主屏幕', installingApp:'正在添加到主屏幕…', installHelpTitle:'添加到主屏幕', gotIt:'知道了',
     installIosHelp:'请使用 Safari 打开本站，点击浏览器的“分享”按钮，然后选择“添加到主屏幕”。',
     installBrowserHelp:'如果浏览器没有弹出安装框，请打开浏览器菜单，选择“安装应用”或“添加到主屏幕”。',
     installHttpsHelp:'安装应用需要通过 HTTPS 网站访问，请打开本站的 HTTPS 地址后重试。',
-    installed:'应用已安装到桌面', installDismissed:'已取消安装，你可以稍后再次点击。', backgroundServiceFailed:'后台服务注册失败，请刷新页面后重试。',
+    installed:'已添加到主屏幕', installDismissed:'已取消添加，你可以稍后再次点击。', backgroundServiceFailed:'后台服务注册失败，请刷新页面后重试。',
     installDetected:'当前环境：{browser}', installGuideWechat:'微信内置浏览器通常不会显示网页安装按钮，请先转到系统浏览器。',
     installGuideQq:'QQ 内置浏览器通常需要先转到系统浏览器，再添加到桌面。', installGuideHuawei:'华为浏览器支持把 PWA 直接添加到手机桌面。',
     installGuideIos:'iPhone/iPad 需要从浏览器的分享菜单添加到主屏幕。', installGuideDesktop:'当前浏览器没有返回系统安装弹窗，请使用浏览器菜单或 Windows 备用快捷方式。',
     installGuideMobile:'当前浏览器没有返回系统安装弹窗，请从浏览器菜单添加到手机桌面。',
-    openBrowserStep1:'点击右上角“…”菜单', openBrowserStep2:'选择“在浏览器打开”', openBrowserStep3:'在系统浏览器中再次点击网页上的“安装到桌面”',
+    openBrowserStep1:'点击右上角“…”菜单', openBrowserStep2:'选择“在浏览器打开”', openBrowserStep3:'在系统浏览器中再次点击网页上的“添加到主屏幕”',
     huaweiStep1:'点击浏览器右下角“∷”菜单', huaweiStep2:'选择“添加至”', huaweiStep3:'选择“桌面”并确认',
     iosStep1:'点击浏览器的“分享”按钮', iosStep2:'向下滑动并选择“添加到主屏幕”', iosStep3:'点击右上角“添加”',
     desktopStep1:'先查看地址栏右侧是否有安装图标', desktopStep2:'如果没有，打开右上角菜单，寻找“安装应用”“将此站点作为应用安装”或“创建快捷方式”', desktopStep3:'国产浏览器仍没有该选项时，使用下方 Windows 快捷方式备用按钮',
@@ -86,7 +86,7 @@ const translations = {
     direct:'One-to-one', groups:'Fan groups', admin:'Admin', logout:'Log out', followSystem:'Use system language',
     homeDescription:'No review — speak freely.', startConsultation:'Start consultation', viewGroups:'View groups',
     enableNotifications:'Enable notifications', notificationHint:'Click Enable to allow browser notifications.',
-    installApp:'Install app', installIos:'Add to Home Screen', installedApp:'Added to desktop', installingApp:'Finishing installation…', installHelpTitle:'Install this app', gotIt:'Got it',
+    installApp:'Add to Home Screen', installIos:'Add to Home Screen', installedApp:'Added to Home Screen', installingApp:'Adding to Home Screen…', installHelpTitle:'Add to Home Screen', gotIt:'Got it',
     installIosHelp:'Open this site in Safari, tap the Share button, then choose Add to Home Screen.',
     installBrowserHelp:'If no install dialog appears, open the browser menu and choose Install app or Add to Home Screen.',
     installHttpsHelp:'App installation requires HTTPS. Open the HTTPS version of this site and try again.',
@@ -95,7 +95,7 @@ const translations = {
     installGuideQq:'The QQ in-app browser usually needs to hand this page off to your system browser first.', installGuideHuawei:'Huawei Browser can add this PWA directly to your Home screen.',
     installGuideIos:'On iPhone/iPad, add the app from the browser Share menu.', installGuideDesktop:'The browser did not provide an automatic install prompt. Use its menu or the Windows shortcut fallback.',
     installGuideMobile:'The browser did not provide an automatic install prompt. Add it from the browser menu.',
-    openBrowserStep1:'Open the “…” menu in the top-right corner', openBrowserStep2:'Choose “Open in browser”', openBrowserStep3:'In the system browser, tap “Install app” on this page again',
+    openBrowserStep1:'Open the “…” menu in the top-right corner', openBrowserStep2:'Choose “Open in browser”', openBrowserStep3:'In the system browser, tap “Add to Home Screen” on this page again',
     huaweiStep1:'Open the “∷” menu at the bottom-right', huaweiStep2:'Choose “Add to”', huaweiStep3:'Choose “Desktop” and confirm',
     iosStep1:'Tap the browser Share button', iosStep2:'Scroll down and choose Add to Home Screen', iosStep3:'Tap Add in the top-right corner',
     desktopStep1:'First look for an install icon on the right side of the address bar', desktopStep2:'Otherwise open the top-right menu and look for Install app, Install this site as an app, or Create shortcut', desktopStep3:'If a domestic browser has no such option, use the Windows shortcut fallback below',
@@ -444,18 +444,26 @@ async function handleInstallApp() {
   if (state.deferredInstallPrompt) {
     const promptEvent = state.deferredInstallPrompt;
     state.deferredInstallPrompt = null;
-    await promptEvent.prompt();
-    const { outcome } = await promptEvent.userChoice;
-    if (outcome === 'accepted') {
-      $('#installAppIcon').textContent = '✓';
-      $('#installApp').querySelector('[data-i18n="installApp"]').textContent = tr('installingApp');
-      $('#installApp').disabled = true;
+    try {
+      const promptResult = await promptEvent.prompt();
+      const choice = promptResult?.outcome ? promptResult : await promptEvent.userChoice;
+      if (choice?.outcome === 'accepted') {
+        $('#installAppIcon').textContent = '✓';
+        $('#installApp').querySelector('[data-i18n="installApp"]').textContent = tr('installingApp');
+        $('#installApp').disabled = true;
+      }
+      else {
+        toast(tr('installDismissed'));
+        updateInstallButton();
+      }
+      return;
     }
-    else {
-      toast(tr('installDismissed'));
+    catch (err) {
+      console.warn('Native PWA install prompt failed:', err);
       updateInstallButton();
+      showInstallHelp();
+      return;
     }
-    return;
   }
   showInstallHelp();
 }
