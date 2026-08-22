@@ -39,7 +39,7 @@ const translations = {
     direct:'一对一咨询', groups:'粉丝交流群', admin:'管理后台', logout:'退出登录', followSystem:'跟随系统',
     homeDescription:'没有审核，畅所欲言', startConsultation:'开始咨询', viewGroups:'查看群聊',
     enableNotifications:'开启新消息通知', notificationHint:'点击开启后，浏览器会请求通知权限。',
-    installApp:'添加到主屏幕', installIos:'添加到主屏幕', installedApp:'已添加到主屏幕', installingApp:'正在添加到主屏幕…', installHelpTitle:'添加到主屏幕', gotIt:'知道了',
+    installApp:'添加到主屏幕', installIos:'添加到主屏幕', installedApp:'已添加到主屏幕', installingApp:'正在添加到主屏幕…', installHelpTitle:'添加到主屏幕', playInstallTutorial:'播放添加教程', closeInstallTutorial:'关闭教程视频', gotIt:'知道了',
     installIosHelp:'请使用 Safari 打开本站，点击浏览器的“分享”按钮，然后选择“添加到主屏幕”。',
     installBrowserHelp:'如果浏览器没有弹出安装框，请打开浏览器菜单，选择“安装应用”或“添加到主屏幕”。',
     installHttpsHelp:'安装应用需要通过 HTTPS 网站访问，请打开本站的 HTTPS 地址后重试。',
@@ -86,7 +86,7 @@ const translations = {
     direct:'One-to-one', groups:'Fan groups', admin:'Admin', logout:'Log out', followSystem:'Use system language',
     homeDescription:'No review — speak freely.', startConsultation:'Start consultation', viewGroups:'View groups',
     enableNotifications:'Enable notifications', notificationHint:'Click Enable to allow browser notifications.',
-    installApp:'Add to Home Screen', installIos:'Add to Home Screen', installedApp:'Added to Home Screen', installingApp:'Adding to Home Screen…', installHelpTitle:'Add to Home Screen', gotIt:'Got it',
+    installApp:'Add to Home Screen', installIos:'Add to Home Screen', installedApp:'Added to Home Screen', installingApp:'Adding to Home Screen…', installHelpTitle:'Add to Home Screen', playInstallTutorial:'Play tutorial', closeInstallTutorial:'Close tutorial video', gotIt:'Got it',
     installIosHelp:'Open this site in Safari, tap the Share button, then choose Add to Home Screen.',
     installBrowserHelp:'If no install dialog appears, open the browser menu and choose Install app or Add to Home Screen.',
     installHttpsHelp:'App installation requires HTTPS. Open the HTTPS version of this site and try again.',
@@ -155,6 +155,8 @@ function applyLanguage(preference = state.languagePreference, rerender = true) {
   $('#languageButton').title = tr('language');
   $('#languageButton').setAttribute('aria-label', tr('language'));
   $('#mobileMenu').setAttribute('aria-label', tr('openMenu'));
+  $('#closeIosInstallVideo').title = tr('closeInstallTutorial');
+  $('#closeIosInstallVideo').setAttribute('aria-label', tr('closeInstallTutorial'));
   $$('[data-language]').forEach(button => button.classList.toggle('active', button.dataset.language === preference));
   updateInstallButton();
   if (!rerender || !state.me) return;
@@ -379,11 +381,7 @@ function showInstallHelp(message = '') {
   const guide = installGuideFor(environment);
   $('#installEnvironment').textContent = tr('installDetected', { browser:environment.name });
   $('#installHelpText').textContent = message || tr(guide.summary);
-  $('#iosInstallVideoWrap').classList.toggle('hidden', !guide.video);
-  if (!guide.video) {
-    $('#iosInstallVideo').pause();
-    $('#iosInstallVideo').currentTime = 0;
-  }
+  $('#openIosInstallVideo').classList.toggle('hidden', !guide.video);
   $('#installHelpSteps').innerHTML = guide.steps.map((key, index) => (
     `<li><span>${index + 1}</span><div>${escapeHtml(tr(key))}</div></li>`
   )).join('');
@@ -401,9 +399,31 @@ function closeInstallHelp() {
   dialog.classList.add('hidden');
   dialog.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('dialog-open');
-  $('#iosInstallVideo').pause();
-  $('#iosInstallVideo').currentTime = 0;
+  closeIosInstallVideo(false);
   if (!$('#installApp').disabled) $('#installApp').focus();
+}
+
+async function openIosInstallVideo() {
+  const viewer = $('#iosInstallVideoViewer');
+  const video = $('#iosInstallVideo');
+  viewer.classList.remove('hidden');
+  viewer.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('dialog-open');
+  video.currentTime = 0;
+  await video.play().catch(() => {});
+  $('#closeIosInstallVideo').focus();
+}
+
+function closeIosInstallVideo(restoreFocus = true) {
+  const viewer = $('#iosInstallVideoViewer');
+  if (viewer.classList.contains('hidden')) return;
+  const video = $('#iosInstallVideo');
+  video.pause();
+  video.currentTime = 0;
+  viewer.classList.add('hidden');
+  viewer.setAttribute('aria-hidden', 'true');
+  if ($('#installHelp').classList.contains('hidden')) document.body.classList.remove('dialog-open');
+  if (restoreFocus && !$('#openIosInstallVideo').classList.contains('hidden')) $('#openIosInstallVideo').focus();
 }
 
 async function copyInstallUrl() {
@@ -731,6 +751,9 @@ $('#sidebarBackdrop').onclick = () => setSidebarOpen(false);
 $('#enableNotifications').onclick = () => setupPush(true);
 $('#installApp').onclick = handleInstallApp;
 $('#closeInstallHelp').onclick = closeInstallHelp;
+$('#openIosInstallVideo').onclick = openIosInstallVideo;
+$('#closeIosInstallVideo').onclick = () => closeIosInstallVideo();
+$('#iosInstallVideoViewer').onclick = (event) => { if (event.target === $('#iosInstallVideoViewer')) closeIosInstallVideo(); };
 $('#copyInstallUrl').onclick = copyInstallUrl;
 $('#downloadWindowsShortcut').onclick = downloadWindowsShortcut;
 $('#installHelp').onclick = (event) => { if (event.target === $('#installHelp')) closeInstallHelp(); };
@@ -772,6 +795,10 @@ document.addEventListener('click', (event) => {
 });
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
+  if (!$('#iosInstallVideoViewer').classList.contains('hidden')) {
+    closeIosInstallVideo();
+    return;
+  }
   setSidebarOpen(false);
   $('#languageMenu').classList.add('hidden');
   closeInstallHelp();

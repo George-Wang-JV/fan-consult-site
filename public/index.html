@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="废慨vc跟单中心" />
   <title>废慨vc跟单中心</title>
-  <link rel="stylesheet" href="/styles.css?v=20260822-pwa3" />
+  <link rel="stylesheet" href="/styles.css?v=20260822-ios-guide2" />
   <link rel="manifest" href="/manifest.webmanifest?v=20260822-brand1" />
   <link rel="icon" href="/icon-192.png?v=20260822-brand1" type="image/png" />
   <link rel="apple-touch-icon" href="/icon-180.png?v=20260822-brand1" />
@@ -201,17 +201,7 @@
       <h3 id="installHelpTitle" data-i18n="installHelpTitle">添加到主屏幕</h3>
       <div id="installEnvironment" class="install-environment"></div>
       <p id="installHelpText"></p>
-      <div id="iosInstallVideoWrap" class="install-help-video-wrap hidden">
-        <video
-          id="iosInstallVideo"
-          class="install-help-video"
-          src="/ios-add-to-home-screen.mp4?v=20260822-ios-guide1"
-          controls
-          playsinline
-          webkit-playsinline
-          preload="metadata"
-        >您的浏览器暂不支持视频播放。</video>
-      </div>
+      <button id="openIosInstallVideo" class="secondary install-video-launch hidden" type="button">▶ <span data-i18n="playInstallTutorial">播放添加教程</span></button>
       <ol id="installHelpSteps" class="install-help-steps"></ol>
       <div class="install-help-actions">
         <button id="copyInstallUrl" class="secondary hidden" type="button" data-i18n="copyWebsiteUrl">复制网站地址</button>
@@ -219,6 +209,21 @@
         <button id="closeInstallHelp" class="primary" type="button" data-i18n="gotIt">知道了</button>
       </div>
     </section>
+  </div>
+
+  <div id="iosInstallVideoViewer" class="install-video-viewer hidden" role="dialog" aria-modal="true" aria-label="添加到主屏幕教程视频" aria-hidden="true">
+    <div class="install-video-shell">
+      <button id="closeIosInstallVideo" class="install-video-close" type="button" aria-label="关闭教程视频" title="关闭教程视频">✕</button>
+      <video
+        id="iosInstallVideo"
+        class="ios-install-video"
+        src="/ios-add-to-home-screen.mp4?v=20260822-ios-guide1"
+        controls
+        playsinline
+        webkit-playsinline
+        preload="metadata"
+      >您的浏览器暂不支持视频播放。</video>
+    </div>
   </div>
 
   <div id="imageViewer" class="image-viewer hidden" role="dialog" aria-modal="true" aria-label="图片预览" aria-hidden="true">
@@ -236,6 +241,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/app.js?v=20260822-ios-guide1"></script>
+  <script src="/app.js?v=20260822-ios-guide2"></script>
 </body>
 </html>
